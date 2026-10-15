@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Complete approved artwork; the outer 18dp extends its edge pixels for adaptive masking. -->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@mipmap/ic_launcher_foreground"
+    android:gravity="fill"
+    android:filter="true" />

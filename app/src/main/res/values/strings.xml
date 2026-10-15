@@ -1,0 +1,206 @@
+<resources>
+    <string name="app_name" translatable="false">ZFL Launcher</string>
+
+    <!-- Home screen -->
+    <string name="search">Search</string>
+    <string name="glass_prompt_title">Enable glass effect</string>
+    <string name="glass_prompt_body">To blur the wallpaper under the dock, the launcher needs All files access. It\'s the only way Android shares the wallpaper image.</string>
+
+    <!-- Long-press menu -->
+    <string name="menu_remove_app">Remove App</string>
+    <string name="menu_app_info">App Info</string>
+    <string name="menu_add_to_dock">Add to Dock</string>
+    <string name="menu_remove_from_dock">Remove from Dock</string>
+    <string name="menu_dock_full">Dock is full</string>
+    <string name="menu_hide_app">Hide App</string>
+
+    <!-- Common actions -->
+    <string name="action_back">Back</string>
+    <string name="action_done">Done</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+
+    <!-- Settings: main page -->
+    <string name="settings_title">Settings</string>
+    <string name="section_general">General</string>
+    <string name="section_transition">Transition</string>
+    <string name="section_icons">Icon Customization</string>
+    <string name="section_about">About</string>
+    <string name="default_home_select">Select default home screen</string>
+    <string name="default_home_active">ZFL is your home screen</string>
+    <string name="row_general">General</string>
+    <string name="row_language">Language</string>
+    <string name="row_grid">Screen Grid</string>
+    <string name="row_transition">Transition Effect</string>
+    <string name="row_animations">App Animations</string>
+    <string name="row_hidden_apps">Hidden Apps</string>
+    <string name="row_change_icon">Change App Icon</string>
+    <string name="row_change_name">Change App Name</string>
+    <string name="row_version">Version</string>
+    <string name="row_license">License</string>
+
+    <!-- Settings: general -->
+    <string name="general_hide_navigation">Hide navigation</string>
+    <string name="general_blur">Blur effect</string>
+    <string name="general_custom_text_size">Custom text size</string>
+    <string name="general_wallpaper_access">Allow wallpaper access</string>
+    <string name="general_wallpaper_access_body">The blur needs to read your wallpaper. Android only allows that with All files access; ZFL never reads anything else.</string>
+
+    <!-- Settings: transition -->
+    <string name="transition_section">Home Screen Pages</string>
+    <string name="effect_default">Default</string>
+    <string name="effect_rotation">Rotation</string>
+    <string name="effect_flip">Flip</string>
+    <string name="effect_zoom_in">Zoom in</string>
+    <string name="effect_alpha">Alpha</string>
+
+    <!-- Settings: animations -->
+    <string name="animations_resume">Resume animation</string>
+    <string name="animations_resume_description">Icons zoom into place when you return to the home screen.</string>
+    <string name="animations_open_close">Open/close apps animation</string>
+    <string name="animations_open_close_description">Apps grow out of their icon when you open them.</string>
+
+    <!-- Settings: app customization -->
+    <string name="hidden_apps_description">Hidden apps disappear from the home screen but stay installed.</string>
+    <string name="change_icon_description">Tap an app to pick an image from your gallery as its icon.</string>
+    <string name="change_name_description">Tap an app to change the name shown under its icon.</string>
+    <string name="icon_import_failed">Couldn\'t read this image</string>
+    <string name="rename_title">Rename app</string>
+    <string name="rename_original">Original name: %1$s</string>
+    <string name="license_summary">ZFL Launcher is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. It comes with ABSOLUTELY NO WARRANTY.</string>
+    <string name="license_open_website">Open on gnu.org</string>
+    <string name="folder_default_name">Folder</string>
+    <string name="menu_edit_home">Edit Home Screen</string>
+    <string name="menu_rename_folder">Rename</string>
+    <string name="edit_edit">Edit</string>
+    <string name="edit_done">Done</string>
+    <string name="edit_customize">Customize</string>
+    <string name="edit_wallpapers">Wallpapers</string>
+    <string name="remove_dialog_title">Remove “%1$s”?</string>
+    <string name="remove_dialog_message">The app stays installed, it just leaves the Home Screen.</string>
+    <string name="remove_dialog_remove_from_home">Remove from Home Screen</string>
+    <string name="remove_dialog_uninstall">Delete App</string>
+    <string name="row_import">Import Layout</string>
+    <string name="import_title">Import Layout</string>
+    <string name="import_description">Bring your Home Screen over from another launcher: pages, folders and the dock. Works with launchers based on Android\'s Launcher3, like iOS27L.</string>
+    <string name="import_choose_launcher">Launcher</string>
+    <string name="import_no_launchers">No compatible launchers found.</string>
+    <string name="import_not_allowed">This launcher doesn\'t allow other apps to read its layout.</string>
+    <string name="import_summary">What will be imported</string>
+    <string name="import_pages">Pages</string>
+    <string name="import_folders">Folders</string>
+    <string name="import_apps_on_home">Apps on Home Screen</string>
+    <string name="import_remove_others">Remove other apps from Home Screen</string>
+    <string name="import_widgets_note">Widgets are not imported yet. Apps removed from the Home Screen stay installed.</string>
+    <string name="import_action">Import</string>
+    <string name="import_confirm_title">Import from %1$s?</string>
+    <string name="import_confirm_message">Your current Home Screen layout will be replaced.</string>
+    <string name="import_done">Home Screen imported</string>
+    <plurals name="import_remove_others_count">
+        <item quantity="one">%d app that isn\'t on its Home Screen</item>
+        <item quantity="other">%d apps that aren\'t on its Home Screen</item>
+    </plurals>
+    <string name="menu_add_to_home">Add to Home Screen</string>
+    <string name="library_title">App Library</string>
+    <string name="library_suggestions">Suggestions</string>
+    <string name="library_recently_added">Recently Added</string>
+    <string name="library_other">Other</string>
+    <string name="search_suggestions">Suggestions</string>
+    <string name="search_show_more">Show More</string>
+    <string name="search_show_less">Show Less</string>
+    <string name="search_hint">Search</string>
+    <string name="search_web">Search the web for “%1$s”</string>
+
+    <!-- Interface settings -->
+    <string name="section_interface">Interface</string>
+    <string name="row_glass">Glass &amp; Blur</string>
+    <string name="row_icons">Icons</string>
+    <string name="row_home_screen">Home Screen &amp; Dock</string>
+    <string name="row_context_menu">Context Menu</string>
+    <string name="glass_section_panels">Dock, pills and menus</string>
+    <string name="glass_tint">Glass brightness</string>
+    <string name="glass_edge">Edge highlight</string>
+    <string name="glass_section_background">Background</string>
+    <string name="glass_home_blur">Blur behind folders and menus</string>
+    <string name="glass_home_blur_radius">Blur strength</string>
+    <string name="icons_size">Icon size</string>
+    <string name="icons_corner">Corner rounding</string>
+    <string name="icons_labels">App names</string>
+    <string name="icons_footer">0% is a square, 100% a circle. Label size is in General.</string>
+    <string name="home_section_dock">Dock</string>
+    <string name="home_show_dock">Show dock</string>
+    <string name="home_dock_background">Dock background</string>
+    <string name="home_dock_apps">Apps in dock</string>
+    <string name="home_section_pages">Pages</string>
+    <string name="home_page_pill">Search pill and page dots</string>
+    <string name="home_swipe_search">Swipe to open search</string>
+    <string name="home_swipe_disabled">Off</string>
+    <string name="home_swipe_down">Down</string>
+    <string name="home_swipe_up">Up</string>
+    <string name="home_app_library">App Library</string>
+    <string name="menu_dim">Background dimming</string>
+    <string name="menu_section_items">Items</string>
+    <string name="menu_shortcuts">App shortcuts</string>
+    <string name="menu_dock_toggle">Add to / Remove from Dock</string>
+    <string name="menu_rename_folder_setting">Rename folder</string>
+    <string name="edit_add_widget">Add Widget</string>
+    <string name="widget_add">Add Widget</string>
+    <string name="widget_gallery_search">Search Widgets</string>
+    <string name="widget_remove">Remove Widget</string>
+    <string name="widget_choose_photo">Choose Photo</string>
+    <string name="widget_clock">Clock</string>
+    <string name="widget_calendar">Calendar</string>
+    <string name="widget_weather">Weather</string>
+    <string name="widget_photo">Photo</string>
+    <string name="widget_battery">Battery</string>
+    <string name="widget_suggestions">App Suggestions</string>
+    <string name="widget_clock_description">See the current time at home and around the world.</string>
+    <string name="widget_calendar_description">Track the day of the month and your upcoming events.</string>
+    <string name="widget_weather_description">See the current weather conditions and forecast for a location.</string>
+    <string name="widget_photo_description">Keep a favorite photo on your Home Screen.</string>
+    <string name="widget_battery_description">View the battery level of your phone.</string>
+    <string name="widget_suggestions_description">Get app suggestions based on how you use your phone.</string>
+    <string name="widget_variant_clock">Clock</string>
+    <string name="widget_variant_world_clock">World Clock</string>
+    <string name="widget_variant_month">Month</string>
+    <string name="widget_variant_up_next">Up Next</string>
+    <string name="widget_variant_weather_snapshot">Weather Snapshot</string>
+    <string name="widget_variant_hourly">Hourly Outlook</string>
+    <string name="widget_variant_full_forecast">Full Forecast</string>
+    <string name="widget_variant_photo_small">Small Photo</string>
+    <string name="widget_variant_photo_medium">Medium Photo</string>
+    <string name="widget_variant_photo_large">Large Photo</string>
+    <string name="widget_variant_status">Status</string>
+    <string name="widget_variant_app_suggestion">App Suggestion</string>
+    <string name="city_now">Now</string>
+    <string name="city_paris">Paris</string>
+    <string name="city_new_york">New York</string>
+    <string name="city_london">London</string>
+    <string name="clock_today">Today</string>
+    <string name="clock_tomorrow">Tomorrow</string>
+    <string name="clock_yesterday">Yesterday</string>
+    <string name="clock_offset_hours">%1$sHRS</string>
+    <string name="calendar_no_permission">Tap to show your events.</string>
+    <string name="calendar_no_events">No more events</string>
+    <string name="calendar_all_day">All day</string>
+    <string name="weather_high_low">H:%1$s L:%2$s</string>
+    <string name="weather_set_location">Tap to choose a location</string>
+    <string name="weather_loading">Loading weather…</string>
+    <string name="weather_clear">Clear</string>
+    <string name="weather_mainly_clear">Mainly Clear</string>
+    <string name="weather_partly_cloudy">Partly Cloudy</string>
+    <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_fog">Fog</string>
+    <string name="weather_drizzle">Drizzle</string>
+    <string name="weather_rain">Rain</string>
+    <string name="weather_freezing_rain">Freezing Rain</string>
+    <string name="weather_snow">Snow</string>
+    <string name="weather_showers">Showers</string>
+    <string name="weather_snow_showers">Snow Showers</string>
+    <string name="weather_thunderstorm">Thunderstorm</string>
+    <string name="weather_location">Location</string>
+    <string name="weather_current_location">Current Location</string>
+    <string name="weather_search_city">Search City</string>
+    <string name="weather_search_hint">City name</string>
+</resources>

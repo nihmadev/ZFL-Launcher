@@ -1,0 +1,48 @@
+package com.zfl.launcher.settings
+
+import com.zfl.launcher.ui.theme.Tokens
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+class SettingsStateTest {
+    @Test
+    fun sanitizedClampsOutOfRangeValues() {
+        val state = SettingsState(
+            textScale = 9f,
+            gridRows = 2,
+            glassTint = -1f,
+            homeBlurRadius = 500f,
+            menuDim = 2f,
+            iconScale = 0.1f,
+            iconCorner = 3f,
+        ).sanitized()
+        assertEquals(SettingsState.MAX_TEXT_SCALE, state.textScale)
+        assertEquals(SettingsState.GRID_ROW_OPTIONS.first(), state.gridRows)
+        assertEquals(0f, state.glassTint)
+        assertEquals(SettingsState.MAX_HOME_BLUR, state.homeBlurRadius)
+        assertEquals(SettingsState.MAX_MENU_DIM, state.menuDim)
+        assertEquals(SettingsState.MIN_ICON_SCALE, state.iconScale)
+        assertEquals(SettingsState.MAX_ICON_CORNER, state.iconCorner)
+    }
+
+    @Test
+    fun defaultsAreAlreadySanitized() {
+        assertEquals(SettingsState(), SettingsState().sanitized())
+    }
+
+    @Test
+    fun bottomBarShrinksWithHiddenDockAndPill() {
+        val full = SettingsState()
+        assertEquals(
+            Tokens.PillHeight + SettingsState.PILL_MARGIN * 2 + Tokens.DockHeight + Tokens.DockBottomMargin,
+            full.bottomBarHeight,
+        )
+        assertEquals(0f, full.copy(showDock = false, showPagePill = false).bottomBarHeight.value)
+    }
+
+    @Test
+    fun dockGrowsWithIcons() {
+        val big = SettingsState(iconScale = 1.2f)
+        assertEquals((Tokens.DockHeight + Tokens.IconSize * 0.2f).value, big.dockHeight.value, 0.01f)
+    }
+}

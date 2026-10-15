@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- List every installed app -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- "Remove App" menu action -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Only used to read the wallpaper bitmap for the glass blur (Android 13+ hides it otherwise) -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <!-- Weather widget only: forecasts and city search from Open-Meteo (no account, no API key) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Weather widget, "Current Location" option only: approximate position for the forecast -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Calendar "Up Next" widget: shows your upcoming events, asked when you tap the widget -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.ZFL">
+
+        <activity
+            android:name=".MainActivity"
+            android:clearTaskOnLaunch="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density|smallestScreenSize"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:resizeableActivity="false"
+            android:resumeWhilePausing="true"
+            android:screenOrientation="portrait"
+            android:stateNotNeeded="true"
+            android:taskAffinity=""
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Launcher settings: the "ZFL Launcher" icon in the app grid opens this. -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.ZFL.Settings">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
