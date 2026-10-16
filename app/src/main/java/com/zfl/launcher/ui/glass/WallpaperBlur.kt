@@ -10,6 +10,7 @@ import android.os.Environment
 import android.view.WindowManager
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.max
@@ -75,7 +76,7 @@ object WallpaperBlur {
         val dx = (outW - ww * scale) / 2f
         val dy = (outH - wh * scale) / 2f
 
-        val small = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        val small = createBitmap(outW, outH)
         Canvas(small).apply {
             translate(dx, dy)
             scale(scale, scale)

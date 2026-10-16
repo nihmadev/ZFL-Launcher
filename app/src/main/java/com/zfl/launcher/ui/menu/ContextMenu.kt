@@ -2,7 +2,6 @@ package com.zfl.launcher.ui.menu
 
 import android.content.pm.ShortcutInfo
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -57,7 +56,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +73,8 @@ import com.zfl.launcher.data.WidgetEntry
 import com.zfl.launcher.ui.widgets.PageWidgetBody
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.PageWidgetEntry
+import com.zfl.launcher.data.WidgetStackEntry
+import androidx.compose.material.icons.outlined.Layers
 import com.zfl.launcher.data.WidgetKind
 import com.zfl.launcher.data.WidgetSize
 import com.zfl.launcher.ui.widgets.WidgetSizeGlyph
@@ -90,7 +91,10 @@ import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.LocalIconLoader
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import com.zfl.launcher.ui.theme.Motion
 
 /** What is drawn on the left side of a menu row. */
 private sealed interface MenuIcon {
@@ -136,7 +140,7 @@ fun ContextMenuOverlay(
     // Read only in draw/layer lambdas: the animation itself never recomposes the menu.
     val progress = animateFloatAsState(
         targetValue = if (target != null) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 500f),
+        animationSpec = Motion.pop(),
         label = "menu",
     )
     val settled by remember { derivedStateOf { progress.value < 0.01f } }
@@ -197,7 +201,11 @@ fun ContextMenuOverlay(
                     entries = if (above) entries.asReversed() else entries,
                     repository = repository,
                     header = widget?.let { w -> widgetActions.sizes(w).takeIf { it.size > 1 } }?.let { sizes ->
-                        { WidgetSizeRow(widget, sizes, onResize = { span -> widgetActions.resize(widget.id, span) }) }
+                        {
+                            WidgetSizeRow(widget, sizes, available = { widgetActions.isSizeAvailable(widget, it) }) { span ->
+                                widgetActions.resize(widget.id, span)
+                            }
+                        }
                     },
                     modifier = Modifier.graphicsLayer {
                         val p = progress.value
@@ -321,24 +329,35 @@ interface WidgetMenuActions {
     fun resize(id: String, span: Span)
     /** Sizes the widget can take, in cells. */
     fun sizes(widget: PageWidgetEntry): List<Span>
+    /** False for a size a stack can't take because one of its widgets doesn't support it. */
+    fun isSizeAvailable(widget: PageWidgetEntry, span: Span): Boolean = true
     fun remove(id: String)
     fun pickPhoto(id: String)
+    fun editStack(id: String)
 }
 
 @Composable
-private fun widgetEntries(widget: PageWidgetEntry, hidden: Set<MenuAction>, onEditHome: () -> Unit, actions: WidgetMenuActions): List<MenuItem> =
-    listOfNotNull(
+private fun widgetEntries(widget: PageWidgetEntry, hidden: Set<MenuAction>, onEditHome: () -> Unit, actions: WidgetMenuActions): List<MenuItem> {
+    val stack = widget as? WidgetStackEntry
+    // In a stack, the photo choice applies to the widget being shown.
+    val shown = stack?.currentItem ?: widget
+    return listOfNotNull(
+        MenuItem(stringResource(R.string.stack_edit), MenuIcon.Vector(Icons.Outlined.Layers)) { actions.editStack(widget.id) }
+            .takeIf { stack != null },
         MenuItem(stringResource(R.string.widget_choose_photo), MenuIcon.Vector(Icons.Outlined.Image)) {
-            actions.pickPhoto(widget.id)
-        }.takeIf { widget is WidgetEntry && widget.kind == WidgetKind.Photo },
+            actions.pickPhoto(shown.id)
+        }.takeIf { shown is WidgetEntry && shown.kind == WidgetKind.Photo },
         MenuItem(stringResource(R.string.menu_edit_home), MenuIcon.Vector(Icons.Outlined.Apps)) { onEditHome() }
             .takeIf { MenuAction.EditHome !in hidden },
-        MenuItem(stringResource(R.string.widget_remove), MenuIcon.MinusCircle, destructive = true) { actions.remove(widget.id) },
+        MenuItem(stringResource(if (stack != null) R.string.stack_remove else R.string.widget_remove), MenuIcon.MinusCircle, destructive = true) {
+            actions.remove(widget.id)
+        },
     )
+}
 
-/** One button per available size; the current one is highlighted. */
+/** One button per size; the current one is highlighted, unavailable ones are dimmed. */
 @Composable
-private fun WidgetSizeRow(widget: PageWidgetEntry, sizes: List<Span>, onResize: (Span) -> Unit) {
+private fun WidgetSizeRow(widget: PageWidgetEntry, sizes: List<Span>, available: (Span) -> Boolean, onResize: (Span) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -347,14 +366,15 @@ private fun WidgetSizeRow(widget: PageWidgetEntry, sizes: List<Span>, onResize: 
     ) {
         sizes.forEach { size ->
             val current = size == widget.span
+            val enabled = !current && available(size)
             Box(
                 Modifier
                     .size(46.dp, 38.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(if (current) Color.White.copy(alpha = 0.16f) else Color.Transparent)
-                    .clickable(enabled = !current) { onResize(size) },
+                    .clickable(enabled = enabled) { onResize(size) },
                 contentAlignment = Alignment.Center,
-            ) { WidgetSizeGlyph(size, Tokens.TextPrimary) }
+            ) { WidgetSizeGlyph(size, if (current || enabled) Tokens.TextPrimary else Tokens.TextSecondary.copy(alpha = 0.3f)) }
         }
     }
 }
@@ -391,10 +411,13 @@ private fun MenuRow(item: MenuItem, repository: AppRepository) {
 
 @Composable
 private fun ShortcutIcon(shortcut: ShortcutInfo, repository: AppRepository) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     val loader = LocalIconLoader.current
     val image: ImageBitmap? by produceState<ImageBitmap?>(null, shortcut.id) {
-        value = repository.shortcutIcon(shortcut, context.resources.displayMetrics.densityDpi)?.let(loader::render)
+        // Loading and styling the icon is binder and pixel work: keep it off the main thread.
+        value = withContext(Dispatchers.IO) {
+            repository.shortcutIcon(shortcut, resources.displayMetrics.densityDpi)?.let(loader::render)
+        }
     }
     image?.let {
         Image(it, null, Modifier.size(22.dp).clip(RoundedCornerShape(6.dp)))

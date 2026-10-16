@@ -1,7 +1,6 @@
 package com.zfl.launcher.ui.home
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,6 +51,7 @@ import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.FolderEntry
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
+import com.zfl.launcher.ui.theme.Motion
 
 private val PanelWidth = 340.dp
 private val PanelHeight = 356.dp
@@ -80,7 +80,7 @@ fun FolderOverlay(
     // Read only in draw/layer lambdas: the animation itself never recomposes the folder.
     val progress = animateFloatAsState(
         targetValue = if (open != null && folder != null) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        animationSpec = Motion.expand(),
         label = "folder",
     )
     val settled by remember { derivedStateOf { progress.value < 0.01f } }

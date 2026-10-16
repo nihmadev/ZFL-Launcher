@@ -18,12 +18,21 @@ object Tokens {
     val DockSideMargin = 13.dp
     val DockBottomMargin = 14.dp
 
+    /** Smart Stack side dots: diameter, gap between dots and distance from the stack's edge. */
+    val StackDotSize = 5.dp
+    val StackDotGap = 4.dp
+    val StackIndicatorMargin = 5.dp
+
     val PillHeight = 26.dp
     val SearchSwipeThreshold = 56.dp
 
     val GlassTint = Color.White.copy(alpha = 0.12f)
     val GlassFallback = Color(0xB32D2D2A)
     val GlassStroke = Color.White.copy(alpha = 0.35f)
+    /** Edge highlight of glass surfaces (and app icons): a top-lit vertical gradient of [GlassStroke]. */
+    val GlassStrokeWidth = 1.dp
+    const val GlassStrokeMidAlpha = 0.25f
+    const val GlassStrokeBottomAlpha = 0.5f
 
     val MenuBackground = Color(0xF21C1C1E)
     val MenuStroke = Color.White.copy(alpha = 0.16f)
@@ -32,6 +41,10 @@ object Tokens {
     val MenuRadius = 24.dp
     val MenuVerticalPadding = 6.dp
     val WidgetBackground = Color(0xFF1C1C1D)
+
+    /** Vertical gradient behind Dark and Tinted app icons (iOS 18 dark icon backdrop). */
+    val IconDarkTop = Color(0xFF323235)
+    val IconDarkBottom = Color(0xFF0F0F11)
 
     val Destructive = Color(0xFFFF453A)
     val Accent = Color(0xFF0A84FF)

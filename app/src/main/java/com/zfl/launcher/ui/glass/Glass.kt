@@ -29,7 +29,6 @@ import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import com.zfl.launcher.ui.theme.Tokens
 
 /** Blurred wallpaper shared by all glass surfaces. `null` means no access: a flat tint is drawn instead. */
@@ -150,9 +149,11 @@ private class GlassNode(
             return
         }
         val brush = strokeBrush ?: Brush.verticalGradient(
-            0f to stroke, 0.5f to stroke.copy(alpha = stroke.alpha * 0.25f), 1f to stroke.copy(alpha = stroke.alpha * 0.5f),
+            0f to stroke,
+            0.5f to stroke.copy(alpha = stroke.alpha * Tokens.GlassStrokeMidAlpha),
+            1f to stroke.copy(alpha = stroke.alpha * Tokens.GlassStrokeBottomAlpha),
         ).also { strokeBrush = it }
-        drawPath(path, brush, style = Stroke(1.dp.toPx()))
+        drawPath(path, brush, style = Stroke(Tokens.GlassStrokeWidth.toPx()))
         drawContent()
     }
 }

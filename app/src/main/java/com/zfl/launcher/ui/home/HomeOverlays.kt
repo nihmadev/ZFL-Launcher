@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,6 +33,7 @@ import com.zfl.launcher.ui.menu.WidgetMenuActions
 import com.zfl.launcher.ui.search.SearchCallbacks
 import com.zfl.launcher.ui.search.SearchOverlay
 import com.zfl.launcher.ui.widgets.WidgetGallery
+import com.zfl.launcher.ui.theme.Motion
 
 /**
  * Everything drawn above the home screen pages: the edit-mode bar, an open folder or App
@@ -52,6 +54,7 @@ internal fun HomeOverlays(
     widgetMenu: WidgetMenuActions,
     onAddWidget: (WidgetKind, WidgetSize) -> Unit,
     onAddAppWidget: (AppWidgetProviderInfo) -> Unit,
+    onAddStack: (WidgetSize) -> Unit,
 ) {
     val menu by vm.menu.collectAsStateWithLifecycle()
     val editMode by vm.editMode.collectAsStateWithLifecycle()
@@ -60,11 +63,12 @@ internal fun HomeOverlays(
     val search by vm.search.collectAsStateWithLifecycle()
     val openCategoryId by vm.openCategory.collectAsStateWithLifecycle()
     val gallery by vm.widgetGallery.collectAsStateWithLifecycle()
+    val editingStack by vm.stacks.editing.collectAsStateWithLifecycle()
 
     AnimatedVisibility(
         visible = editMode,
-        enter = fadeIn(),
-        exit = fadeOut(),
+        enter = fadeIn(Motion.fade()),
+        exit = fadeOut(Motion.fade()),
         modifier = Modifier
             .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
             .padding(top = 4.dp),
@@ -109,6 +113,7 @@ internal fun HomeOverlays(
         appWidgets = appWidgets,
         onAdd = onAddWidget,
         onAddApp = onAddAppWidget,
+        onAddStack = onAddStack,
         onClose = vm::closeWidgetGallery,
     )
 
@@ -124,6 +129,11 @@ internal fun HomeOverlays(
         onAddToHome = vm::addToHome,
         widgetActions = widgetMenu,
         actions = actions,
+    )
+
+    StackEditor(
+        stack = editingStack?.let(state::findStack),
+        actions = remember(vm) { stackEditorActions(vm) },
     )
 
     removeRequest?.let { app ->

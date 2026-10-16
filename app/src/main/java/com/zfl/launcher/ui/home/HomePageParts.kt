@@ -73,6 +73,9 @@ import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.Haptics
+import com.zfl.launcher.ui.theme.Motion
 
 /** One home screen page; long-press on empty space enters edit mode, a tap leaves it. */
 @Composable
@@ -96,6 +99,7 @@ internal fun PageContent(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
     var origin by remember { mutableStateOf(Offset.Zero) }
     var geometry by remember { mutableStateOf<GridGeometry?>(null) }
     val currentEntries by rememberUpdatedState(entries)
@@ -118,7 +122,12 @@ internal fun PageContent(
             .onGloballyPositioned { origin = it.positionInWindow() }
             .pointerInput(editMode) {
                 detectTapGestures(
-                    onLongPress = { if (!editMode && !isOnIcon(it)) onEnterEdit() },
+                    onLongPress = {
+                        if (!editMode && !isOnIcon(it)) {
+                            haptic.performHapticFeedback(Haptics.Lift)
+                            onEnterEdit()
+                        }
+                    },
                     onTap = { if (editMode && !isOnIcon(it)) onExitEdit() },
                 )
             }
@@ -134,6 +143,7 @@ internal fun PageContent(
                         if (!triggered && searchSwipe.isTriggered(total, threshold)) {
                             triggered = true
                             change.consume()
+                            haptic.performHapticFeedback(Haptics.Threshold)
                             currentOnSearch()
                         }
                     },
@@ -163,6 +173,7 @@ internal fun PageContent(
                     withLabel = false,
                     draggable = true,
                     hidden = entry.id == liftedId,
+                    mergeTarget = drag.mergeArmed && drag.mergeCandidate == entry.id,
                 )
             } else {
                 HomeIcon(
@@ -187,7 +198,7 @@ internal fun PageContent(
 internal fun DropMarker(span: Span, modifier: Modifier = Modifier, square: Boolean = false) {
     val settings = LocalSettingsState.current
     val alpha = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(180)) }
+    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(Motion.MARKER_FADE_MS)) }
     val fade = Modifier.graphicsLayer { this.alpha = alpha.value }
     if (span == Span.One) {
         val shape = IconShape(settings.iconCorner)
@@ -272,7 +283,7 @@ internal fun PagePill(
     val showDots = pageCount > 1 && (editMode || pager.isScrollInProgress || current != 0)
     AnimatedContent(
         targetState = showDots,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        transitionSpec = { fadeIn(Motion.fade()) togetherWith fadeOut(Motion.fade()) },
         modifier = modifier
             .height(Tokens.PillHeight)
             .glass(ContinuousRoundedShape(Tokens.PillHeight / 2))

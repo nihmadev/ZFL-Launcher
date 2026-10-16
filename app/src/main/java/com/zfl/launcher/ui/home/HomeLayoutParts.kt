@@ -9,7 +9,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -62,6 +61,7 @@ import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.shape.IconShape
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
+import com.zfl.launcher.ui.theme.Motion
 
 /** Tallest a grid cell may get, so icons don't drift apart on a sparse 4×5 grid. */
 private val MaxCellHeight = 112.dp
@@ -70,7 +70,7 @@ private val MaxCellHeight = 112.dp
 private val DockIconGap = 8.dp
 
 /** Spring used when icons slide to their new slots. */
-private val SlotSpring = spring<IntOffset>(dampingRatio = 0.82f, stiffness = 420f)
+private val SlotSpring = Motion.settle<IntOffset>()
 
 /**
  * Lays out [entries] as a [columns] × [rows] grid, filled top-left first (widgets span
@@ -251,7 +251,7 @@ fun DockBar(
  * directions with slightly different speeds so the screen looks alive, not mechanical.
  */
 fun Modifier.jiggle(active: Boolean, seed: Int): Modifier = composed {
-    val amount by animateFloatAsState(if (active) 1f else 0f, tween(150), label = "jiggleAmount")
+    val amount by animateFloatAsState(if (active) 1f else 0f, Motion.quickFade(), label = "jiggleAmount")
     if (amount == 0f) return@composed this
     val period = remember(seed) { 230 + (seed * 37) % 60 }
     val transition = rememberInfiniteTransition(label = "jiggle")
@@ -311,7 +311,7 @@ fun FolderIcon(
     highlighted: Boolean = false,
 ) {
     val shape = IconShape(LocalSettingsState.current.iconCorner)
-    val scale by animateFloatAsState(if (highlighted) 1.15f else 1f, spring(dampingRatio = 0.6f, stiffness = 400f), label = "folderHover")
+    val scale by animateFloatAsState(if (highlighted) 1.15f else 1f, Motion.bouncy(), label = "folderHover")
     val padding = size * 0.13f
     val gap = size * 0.05f
     val mini = (size - padding * 2 - gap * 2) / 3
@@ -337,8 +337,8 @@ fun FolderIcon(
 /** Glass squircle that appears behind an app icon when another app hovers over it (future folder). */
 @Composable
 fun MergeHalo(visible: Boolean, modifier: Modifier = Modifier) {
-    val scale by animateFloatAsState(if (visible) 1.22f else 0.9f, spring(dampingRatio = 0.6f, stiffness = 400f), label = "halo")
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(150), label = "haloAlpha")
+    val scale by animateFloatAsState(if (visible) 1.22f else 0.9f, Motion.bouncy(), label = "halo")
+    val alpha by animateFloatAsState(if (visible) 1f else 0f, Motion.quickFade(), label = "haloAlpha")
     if (alpha == 0f) return
     val settings = LocalSettingsState.current
     Box(
