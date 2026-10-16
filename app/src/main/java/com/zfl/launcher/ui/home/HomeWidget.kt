@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -32,6 +31,9 @@ import androidx.compose.ui.unit.min
 import com.zfl.launcher.data.WidgetEntry
 import com.zfl.launcher.data.AppWidgetEntry
 import com.zfl.launcher.data.PageWidgetEntry
+import com.zfl.launcher.data.WidgetStackEntry
+import com.zfl.launcher.R
+import com.zfl.launcher.ui.widgets.WidgetStackBody
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.ui.widgets.AppWidgets
 import com.zfl.launcher.ui.widgets.PageWidgetBody
@@ -41,6 +43,7 @@ import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.widgets.WidgetBody
 import com.zfl.launcher.ui.widgets.titleRes
+import com.zfl.launcher.ui.theme.Haptics
 
 /** What a [HomeWidget] reports back. Bounds and pointers are in window coordinates. */
 interface WidgetCallbacks {
@@ -50,6 +53,8 @@ interface WidgetCallbacks {
     /** Edit mode: the finger moved past the touch slop on this widget. */
     fun onDragStart(entry: PageWidgetEntry, bounds: Rect, pointer: Offset)
     fun onRemove(entry: PageWidgetEntry)
+    /** The user swiped stack [stackId] to the widget at [index]. */
+    fun onStackSettled(stackId: String, index: Int)
 }
 
 /**
@@ -81,6 +86,7 @@ val PageWidgetEntry.isSquare: Boolean get() = this is WidgetEntry && size == Wid
  *
  * @param withLabel show the widget's name under it, like home screen widgets in iOS27L.
  * @param draggable edit-mode dragging (home pages only; Today is arranged from the menu).
+ * @param mergeTarget a widget of the same size hovers over this one and will make (or join) a stack.
  */
 @Composable
 fun HomeWidget(
@@ -93,6 +99,7 @@ fun HomeWidget(
     modifier: Modifier = Modifier,
     slotInset: Dp? = null,
     hidden: Boolean = false,
+    mergeTarget: Boolean = false,
 ) {
     val settings = LocalSettingsState.current
     val haptic = LocalHapticFeedback.current
@@ -111,7 +118,7 @@ fun HomeWidget(
                     if (!change.pressed) break
                     if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
                         change.consume()
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptic.performHapticFeedback(Haptics.Lift)
                         currentCallbacks.onDragStart(currentEntry, bounds, bounds.topLeft + change.position)
                         break
                     }
@@ -125,7 +132,7 @@ fun HomeWidget(
                     currentCallbacks.onTap(currentEntry, Offset(p.x / size.width, p.y / size.height), bounds)
                 },
                 onLongPress = { p ->
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    haptic.performHapticFeedback(Haptics.Lift)
                     currentCallbacks.onLongPress(currentEntry, bounds, bounds.topLeft + p)
                 },
             )
@@ -140,15 +147,27 @@ fun HomeWidget(
                 .jiggle(editMode, jiggleSeed),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Box {
-                PageWidgetBody(
-                    entry,
-                    Modifier
-                        .size(body)
-                        .onGloballyPositioned { bounds = it.boundsInWindow() },
-                    onLongPress = { pointer -> currentCallbacks.onLongPress(currentEntry, bounds, pointer) },
-                )
-                // Our own gesture layer; over another app's widget only in edit mode, so its buttons work.
+            Box(Modifier.stackMergeHighlight(mergeTarget)) {
+                val bodyModifier = Modifier
+                    .size(body)
+                    .onGloballyPositioned { bounds = it.boundsInWindow() }
+                if (entry is WidgetStackEntry) {
+                    WidgetStackBody(
+                        entry,
+                        bodyModifier,
+                        interactive = !editMode,
+                        onTap = { item, position -> currentCallbacks.onTap(item, position, bounds) },
+                        onLongPress = { pointer -> currentCallbacks.onLongPress(currentEntry, bounds, pointer) },
+                        onSettled = { index -> currentCallbacks.onStackSettled(currentEntry.id, index) },
+                    )
+                } else {
+                    PageWidgetBody(
+                        entry,
+                        bodyModifier,
+                        onLongPress = { pointer -> currentCallbacks.onLongPress(currentEntry, bounds, pointer) },
+                    )
+                }
+                // Our own gesture layer; over another app's widget (and a stack, which has its own) only in edit mode.
                 if (entry is WidgetEntry || editMode) Box(Modifier.matchParentSize().then(gestures))
                 if (editMode) {
                     RemoveBadge(
@@ -170,6 +189,7 @@ fun HomeWidget(
 /** Name under a widget: the built-in widget's name, or the widget's own label from its app. */
 @Composable
 internal fun widgetLabel(entry: PageWidgetEntry): String = when (entry) {
+    is WidgetStackEntry -> stringResource(R.string.stack_smart)
     is WidgetEntry -> stringResource(entry.kind.titleRes)
     is AppWidgetEntry -> {
         val context = LocalContext.current

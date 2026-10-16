@@ -298,7 +298,7 @@ class DragController(
                 setMerge(null)
                 retarget(destination)
             }
-            canMerge(s, under) && isOver(under, (p - grid.iconCenter(cells[underIndex]!!)).getDistance(), grid.iconSize) -> {
+            canMergeOnto(s.entry, under) && mergeDistance(s, grid, under, cells[underIndex]!!).let { (d, size) -> isOver(under, d, size) } -> {
                 retarget(null)
                 setMerge(under.id)
             }
@@ -320,7 +320,7 @@ class DragController(
         val preview = previewDock()
         val under = preview.getOrNull(((p.x - dock.left) / (dock.width / preview.size.coerceAtLeast(1))).toInt())
         val underCenterX = preview.indexOf(under).let { dock.left + (it + 0.5f) * dock.width / preview.size.coerceAtLeast(1) }
-        if (under != null && canMerge(s, under) &&
+        if (under != null && canMergeOnto(s.entry, under) &&
             isOver(under, kotlin.math.abs(p.x - underCenterX), pageGrid?.iconSize ?: dock.height)
         ) {
             retarget(null)
@@ -354,23 +354,20 @@ class DragController(
         }
     }
 
-    private fun canMerge(s: DragSession, under: HomeEntry): Boolean =
-        s.entry is AppEntry && under.id != s.entry.id && under !is PlaceholderEntry && under !is PageWidgetEntry
-
     /**
-     * Whether the dragged icon covers an icon whose center is [distance] px away. The zone is
+     * Whether the dragged icon (or widget) covers an item whose center is [distance] px away. The zone is
      * big (the icons overlap by about half) and sticky: once a target is picked, it is
      * released only past a wider radius, so small finger jitter never flips the intent.
      */
     private fun isOver(under: HomeEntry, distance: Float, iconSize: Float): Boolean =
         distance < iconSize * if (under.id == mergeCandidate) MERGE_EXIT_RADIUS else MERGE_ENTER_RADIUS
 
-    /** Dropping into an existing folder is unambiguous, so it arms at once; two apps need a short hover. */
+    /** Dropping into an existing folder or stack arms at once; two apps or two widgets need a short hover. */
     private fun setMerge(id: String?) {
         if (id == mergeCandidate) return
         mergeCandidate = id
         mergeJob?.cancel()
-        mergeArmed = id != null && previewEntry(id) is FolderEntry
+        mergeArmed = id != null && mergesAtOnce(previewEntry(id))
         if (id != null && !mergeArmed) {
             mergeJob = scope.launch {
                 delay(MERGE_DELAY_MS)

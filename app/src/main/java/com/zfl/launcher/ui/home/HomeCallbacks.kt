@@ -15,6 +15,7 @@ import com.zfl.launcher.data.AppWidgetEntry
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.WidgetKind
 import com.zfl.launcher.data.WidgetSize
+import com.zfl.launcher.data.WidgetStackEntry
 import com.zfl.launcher.ui.menu.WidgetMenuActions
 import com.zfl.launcher.ui.widgets.suggestionAt
 import com.zfl.launcher.data.PlaceholderEntry
@@ -89,6 +90,8 @@ internal fun widgetCallbacks(
     }
 
     override fun onRemove(entry: PageWidgetEntry) = vm.removeWidget(entry.id)
+
+    override fun onStackSettled(stackId: String, index: Int) = vm.stacks.show(stackId, index)
 }
 
 internal fun widgetMenuActions(vm: LauncherViewModel, actions: LauncherActions): WidgetMenuActions = object : WidgetMenuActions {
@@ -102,7 +105,22 @@ internal fun widgetMenuActions(vm: LauncherViewModel, actions: LauncherActions):
     override fun sizes(widget: PageWidgetEntry): List<Span> = when (widget) {
         is WidgetEntry -> widget.kind.sizes.map { it.span }
         is AppWidgetEntry -> vm.appWidgets.info(widget.appWidgetId)?.let(vm.appWidgets::spans) ?: listOf(widget.span)
+        // Every size one of its widgets takes; the others are shown but unavailable.
+        is WidgetStackEntry -> widget.items.flatMap(::sizes).filter { span -> WidgetSize.entries.any { it.span == span } }.distinct()
+            .sortedWith(compareBy({ it.columns * it.rows }, { it.columns }))
     }
+
+    override fun isSizeAvailable(widget: PageWidgetEntry, span: Span): Boolean =
+        widget !is WidgetStackEntry || widget.items.all { span in sizes(it) }
+
+    override fun editStack(id: String) = vm.stacks.openEditor(id)
+}
+
+internal fun stackEditorActions(vm: LauncherViewModel): StackEditorActions = object : StackEditorActions {
+    override fun move(stackId: String, from: Int, to: Int) = vm.stacks.move(stackId, from, to)
+    override fun remove(stackId: String, itemId: String) = vm.stacks.remove(stackId, itemId)
+    override fun takeOut(stackId: String, itemId: String) = vm.stacks.takeOut(stackId, itemId)
+    override fun close() = vm.stacks.closeEditor()
 }
 
 internal fun libraryCallbacks(vm: LauncherViewModel, actions: LauncherActions): LibraryCallbacks = object : LibraryCallbacks {
