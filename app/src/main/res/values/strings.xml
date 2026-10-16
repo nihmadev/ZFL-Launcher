@@ -127,7 +127,17 @@
     <string name="icons_size">Icon size</string>
     <string name="icons_corner">Corner rounding</string>
     <string name="icons_labels">App names</string>
+    <string name="icons_edge">Edge highlight</string>
     <string name="icons_footer">0% is a square, 100% a circle. Label size is in General.</string>
+    <string name="icons_section_appearance">Appearance</string>
+    <string name="icons_appearance_default">Default</string>
+    <string name="icons_appearance_dark">Dark</string>
+    <string name="icons_appearance_tinted">Tinted</string>
+    <string name="icons_appearance_auto">Automatic</string>
+    <string name="icons_tint_custom">Restyle custom icons</string>
+    <string name="icons_section_tint">Tint color</string>
+    <string name="icons_tint_wallpaper">From wallpaper</string>
+    <string name="icons_tint_saturation">Saturation</string>
     <string name="home_section_dock">Dock</string>
     <string name="home_show_dock">Show dock</string>
     <string name="home_dock_background">Dock background</string>
@@ -148,6 +158,13 @@
     <string name="widget_add">Add Widget</string>
     <string name="widget_gallery_search">Search Widgets</string>
     <string name="widget_remove">Remove Widget</string>
+    <string name="stack_edit">Edit Stack</string>
+    <string name="stack_remove">Remove Stack</string>
+    <string name="stack_smart">Smart Stack</string>
+    <string name="stack_smart_description">Widgets stacked in one place. Swipe up or down to see the next one.</string>
+    <string name="stack_take_out">Move to Home Screen</string>
+    <string name="stack_remove_widget">Remove from Stack</string>
+    <string name="stack_reorder">Reorder</string>
     <string name="widget_choose_photo">Choose Photo</string>
     <string name="widget_clock">Clock</string>
     <string name="widget_calendar">Calendar</string>
@@ -203,4 +220,25 @@
     <string name="weather_current_location">Current Location</string>
     <string name="weather_search_city">Search City</string>
     <string name="weather_search_hint">City name</string>
+
+    <!-- First-run setup (onboarding) -->
+    <string name="onboarding_hello_description">Hello</string>
+    <string name="onboarding_logo_description">ZFL Launcher logo</string>
+    <string name="onboarding_welcome_title">Welcome to %1$s</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_not_now">Not Now</string>
+    <string name="onboarding_progress">Step %1$d of %2$d</string>
+    <string name="onboarding_language_title">Choose Your Language</string>
+    <string name="onboarding_home_title">Make ZFL Your Home Screen</string>
+    <string name="onboarding_home_body">So the Home button and gesture bring you here.</string>
+    <string name="onboarding_home_action">Set as Default</string>
+    <string name="onboarding_wallpaper_title">Allow Wallpaper Access</string>
+    <string name="onboarding_wallpaper_body">Android calls it All files access. ZFL only reads your wallpaper, to blur it under the glass.</string>
+    <string name="onboarding_wallpaper_action">Allow Access</string>
+    <string name="onboarding_import_title">Import Your Home Screen</string>
+    <string name="onboarding_import_body">Bring your pages, folders and dock from your previous launcher.</string>
+    <string name="onboarding_appearance_title">Choose Icon Look</string>
+    <string name="onboarding_appearance_body">It changes every icon on your Home Screen.</string>
+    <string name="onboarding_get_started">Get Started</string>
+    <string name="finish_setup_title">Finish Setting Up</string>
 </resources>

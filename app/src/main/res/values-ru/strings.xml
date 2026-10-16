@@ -119,7 +119,17 @@
     <string name="icons_size">Размер иконок</string>
     <string name="icons_corner">Скругление углов</string>
     <string name="icons_labels">Названия приложений</string>
+    <string name="icons_edge">Обводка</string>
     <string name="icons_footer">0% — квадрат, 100% — круг. Размер подписей — в разделе «Основные».</string>
+    <string name="icons_section_appearance">Вид</string>
+    <string name="icons_appearance_default">Стандартный</string>
+    <string name="icons_appearance_dark">Тёмный</string>
+    <string name="icons_appearance_tinted">Тонированный</string>
+    <string name="icons_appearance_auto">Автоматически</string>
+    <string name="icons_tint_custom">Применять к своим иконкам</string>
+    <string name="icons_section_tint">Цвет тонирования</string>
+    <string name="icons_tint_wallpaper">Из обоев</string>
+    <string name="icons_tint_saturation">Насыщенность</string>
     <string name="home_section_dock">Dock</string>
     <string name="home_show_dock">Показывать Dock</string>
     <string name="home_dock_background">Фон Dock</string>
@@ -140,6 +150,13 @@
     <string name="widget_add">Добавить виджет</string>
     <string name="widget_gallery_search">Поиск виджетов</string>
     <string name="widget_remove">Удалить виджет</string>
+    <string name="stack_edit">Изменить стопку</string>
+    <string name="stack_remove">Удалить стопку</string>
+    <string name="stack_smart">Смарт-стопка</string>
+    <string name="stack_smart_description">Виджеты, сложенные в одном месте. Смахните вверх или вниз, чтобы увидеть следующий.</string>
+    <string name="stack_take_out">Перенести на экран «Домой»</string>
+    <string name="stack_remove_widget">Убрать из стопки</string>
+    <string name="stack_reorder">Переместить</string>
     <string name="widget_choose_photo">Выбрать фото</string>
     <string name="widget_clock">Часы</string>
     <string name="widget_calendar">Календарь</string>
@@ -195,4 +212,25 @@
     <string name="weather_current_location">Текущее местоположение</string>
     <string name="weather_search_city">Поиск города</string>
     <string name="weather_search_hint">Название города</string>
+
+    <!-- First-run setup (onboarding) -->
+    <string name="onboarding_hello_description">Привет</string>
+    <string name="onboarding_logo_description">Логотип ZFL Launcher</string>
+    <string name="onboarding_welcome_title">Добро пожаловать в %1$s</string>
+    <string name="onboarding_continue">Продолжить</string>
+    <string name="onboarding_not_now">Не сейчас</string>
+    <string name="onboarding_progress">Шаг %1$d из %2$d</string>
+    <string name="onboarding_language_title">Выберите язык</string>
+    <string name="onboarding_home_title">Сделайте ZFL домашним экраном</string>
+    <string name="onboarding_home_body">Чтобы кнопка и жест «Домой» вели сюда.</string>
+    <string name="onboarding_home_action">Сделать основным</string>
+    <string name="onboarding_wallpaper_title">Доступ к обоям</string>
+    <string name="onboarding_wallpaper_body">Android называет это доступом ко всем файлам. ZFL читает только обои, чтобы размыть их под стеклом.</string>
+    <string name="onboarding_wallpaper_action">Разрешить доступ</string>
+    <string name="onboarding_import_title">Перенос рабочего стола</string>
+    <string name="onboarding_import_body">Страницы, папки и док из прежнего лаунчера.</string>
+    <string name="onboarding_appearance_title">Вид иконок</string>
+    <string name="onboarding_appearance_body">Меняет все иконки на рабочем столе.</string>
+    <string name="onboarding_get_started">Начать</string>
+    <string name="finish_setup_title">Завершите настройку</string>
 </resources>
