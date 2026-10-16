@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Russian flag, square crop for a round flag badge (the onboarding language list clips it to a circle). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp"
+    android:height="60dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M0,0 H60 V20 H0 Z" />
+    <path android:fillColor="#FF0039A6" android:pathData="M0,20 H60 V40 H0 Z" />
+    <path android:fillColor="#FFD52B1E" android:pathData="M0,40 H60 V60 H0 Z" />
+</vector>
