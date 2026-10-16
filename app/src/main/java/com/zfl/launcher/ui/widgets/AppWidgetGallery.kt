@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
@@ -51,11 +52,12 @@ internal fun AppWidgetsDetail(group: WidgetProviderGroup, onAdd: (AppWidgetProvi
 @Composable
 private fun ProviderPreview(info: AppWidgetProviderInfo) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val widgets = remember { AppWidgets.get(context) }
     val span = remember(info) { widgets.defaultSpan(info) }
     val preview: ImageBitmap? by produceState<ImageBitmap?>(null, info) {
         value = withContext(Dispatchers.IO) {
-            val density = context.resources.displayMetrics.densityDpi
+            val density = resources.displayMetrics.densityDpi
             val drawable = info.loadPreviewImage(context, density) ?: info.loadIcon(context, density)
             drawable?.let { runCatching { it.toBitmap().asImageBitmap() }.getOrNull() }
         }

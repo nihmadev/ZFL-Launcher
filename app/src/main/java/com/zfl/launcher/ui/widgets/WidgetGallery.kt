@@ -4,7 +4,6 @@ import android.appwidget.AppWidgetProviderInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -74,6 +73,7 @@ import com.zfl.launcher.data.WidgetSize
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
 import com.zfl.launcher.R
+import com.zfl.launcher.ui.theme.Motion
 
 private val SheetColor = Color(0xFF242426)
 private val FieldColor = Color(0xFF3A3A3C)
@@ -99,6 +99,7 @@ fun WidgetGallery(
     appWidgets: List<WidgetProviderGroup>,
     onAdd: (WidgetKind, WidgetSize) -> Unit,
     onAddApp: (AppWidgetProviderInfo) -> Unit,
+    onAddStack: (WidgetSize) -> Unit,
     onClose: () -> Unit,
 ) {
     // A built-in kind (WidgetKind) or an app with widgets (WidgetProviderGroup); null = the list.
@@ -107,7 +108,7 @@ fun WidgetGallery(
     val listState = rememberLazyGridState()
     var query by remember { mutableStateOf("") }
     BackHandler(enabled = visible) { if (selected != null) selected = null else onClose() }
-    AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut()) {
+    AnimatedVisibility(visible, enter = fadeIn(Motion.fade()), exit = fadeOut(Motion.fade())) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -117,8 +118,8 @@ fun WidgetGallery(
     }
     AnimatedVisibility(
         visible,
-        enter = slideInVertically(spring(dampingRatio = 0.9f, stiffness = 400f)) { it },
-        exit = slideOutVertically { it },
+        enter = slideInVertically(Motion.sheet()) { it },
+        exit = slideOutVertically(Motion.sheet()) { it },
         modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
     ) {
         Column(
@@ -136,14 +137,15 @@ fun WidgetGallery(
             AnimatedContent(
                 targetState = selected,
                 transitionSpec = {
-                    if (targetState != null) slideInHorizontally { it } togetherWith slideOutHorizontally { -it / 4 } + fadeOut()
-                    else slideInHorizontally { -it / 4 } + fadeIn() togetherWith slideOutHorizontally { it }
+                    if (targetState != null) slideInHorizontally(Motion.push()) { it } togetherWith slideOutHorizontally(Motion.push()) { -it / 4 } + fadeOut(Motion.push())
+                    else slideInHorizontally(Motion.push()) { -it / 4 } + fadeIn(Motion.push()) togetherWith slideOutHorizontally(Motion.push()) { it }
                 },
                 label = "gallery",
             ) { selection ->
                 when (selection) {
                     is WidgetKind -> KindDetail(selection, onAdd = { size -> selected = null; onAdd(selection, size) }, onBack = { selected = null }, onClose = onClose)
                     is WidgetProviderGroup -> AppWidgetsDetail(selection, onAdd = { info -> selected = null; onAddApp(info) }, onBack = { selected = null }, onClose = onClose)
+                    SmartStackPick -> SmartStackDetail(onAdd = { size -> selected = null; onAddStack(size) }, onBack = { selected = null }, onClose = onClose)
                     else -> GalleryHome(appWidgets, listState, query, onQueryChange = { query = it }, onPick = { selected = it })
                 }
             }
@@ -168,6 +170,7 @@ private fun GalleryHome(
     onPick: (Any) -> Unit,
 ) {
     val titles = WidgetKind.entries.associateWith { stringResource(it.titleRes) }
+    val stackTitle = stringResource(R.string.stack_smart)
     val matching = WidgetKind.entries.filter { query.isBlank() || titles.getValue(it).contains(query.trim(), ignoreCase = true) }
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
@@ -181,6 +184,9 @@ private fun GalleryHome(
             items(Featured, span = { (_, size) -> GridItemSpan(if (size == WidgetSize.Small) 1 else 2) }) { (kind, size) ->
                 FeaturedPreview(kind, size, onClick = { onPick(kind) })
             }
+        }
+        if (query.isBlank() || stackTitle.contains(query.trim(), ignoreCase = true)) {
+            item(span = { GridItemSpan(2) }) { SmartStackRow(onClick = { onPick(SmartStackPick) }) }
         }
         items(matching, span = { GridItemSpan(2) }) { kind -> KindRow(kind, titles.getValue(kind), onClick = { onPick(kind) }) }
         // Then every app that offers widgets, as in iOS27L.

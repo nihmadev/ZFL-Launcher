@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.zfl.launcher.data.AppWidgetEntry
 import com.zfl.launcher.data.PageWidgetEntry
+import com.zfl.launcher.data.WidgetStackEntry
+import android.view.ViewGroup
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -204,11 +206,23 @@ fun PageWidgetBody(entry: PageWidgetEntry, modifier: Modifier = Modifier, live: 
     when (entry) {
         is WidgetEntry -> WidgetBody(entry, modifier)
         is AppWidgetEntry -> if (live) HostedWidget(entry, modifier, onLongPress) else HostedSnapshot(entry, modifier)
+        // Previews (menu, drag) show the stack's current widget; the home screen uses WidgetStackBody.
+        is WidgetStackEntry -> PageWidgetBody(entry.currentItem, modifier, live, onLongPress)
     }
 }
 
+/**
+ * Another app's widget, live. With a [cache] (a stack) the host view of a widget id is
+ * created once and reattached, instead of being inflated again each time it is shown.
+ */
 @Composable
-private fun HostedWidget(entry: AppWidgetEntry, modifier: Modifier, onLongPress: ((Offset) -> Unit)?) {
+internal fun HostedWidget(
+    entry: AppWidgetEntry,
+    modifier: Modifier,
+    onLongPress: ((Offset) -> Unit)?,
+    cache: MutableMap<Int, ZflWidgetHostView>? = null,
+    onView: ((ZflWidgetHostView) -> Unit)? = null,
+) {
     val context = LocalContext.current
     val widgets = remember { AppWidgets.get(context) }
     val info = remember(entry.appWidgetId) { widgets.info(entry.appWidgetId) }
@@ -220,11 +234,13 @@ private fun HostedWidget(entry: AppWidgetEntry, modifier: Modifier, onLongPress:
     val currentLongPress by rememberUpdatedState(onLongPress)
     AndroidView(
         factory = { ctx ->
-            widgets.host.createView(ctx, entry.appWidgetId, info) as ZflWidgetHostView
+            cache?.get(entry.appWidgetId)?.also { (it.parent as? ViewGroup)?.removeView(it) }
+                ?: (widgets.host.createView(ctx, entry.appWidgetId, info) as ZflWidgetHostView).also { cache?.put(entry.appWidgetId, it) }
         },
         update = { view ->
             view.cornerRadius = radius
             view.onLongPress = { pointer -> currentLongPress?.invoke(pointer) }
+            onView?.invoke(view)
         },
         modifier = modifier,
     )
@@ -232,7 +248,7 @@ private fun HostedWidget(entry: AppWidgetEntry, modifier: Modifier, onLongPress:
 
 /** Last image of a hosted widget, or a plain card with its name when there is none yet. */
 @Composable
-private fun HostedSnapshot(entry: AppWidgetEntry, modifier: Modifier) {
+internal fun HostedSnapshot(entry: AppWidgetEntry, modifier: Modifier) {
     val shape = ContinuousRoundedShape(HostedRadius)
     val snapshot = AppWidgetSnapshots.get(entry.appWidgetId)
     Box(modifier.clip(shape).background(Tokens.WidgetBackground), contentAlignment = Alignment.Center) {

@@ -45,7 +45,7 @@ fun KindIcon(kind: WidgetKind, size: Dp) {
 }
 
 @Composable
-private fun GlyphTile(icon: androidx.compose.ui.graphics.vector.ImageVector, size: Dp, background: Color, tint: Color) {
+internal fun GlyphTile(icon: androidx.compose.ui.graphics.vector.ImageVector, size: Dp, background: Color, tint: Color) {
     Box(
         Modifier
             .size(size)

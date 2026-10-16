@@ -16,6 +16,7 @@ import android.util.SizeF
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewConfiguration
 import android.view.ViewOutlineProvider
 import androidx.compose.ui.geometry.Offset
@@ -61,6 +62,7 @@ class AppWidgets private constructor(context: Context) {
 
     fun deleteId(appWidgetId: Int) {
         runCatching { host.deleteAppWidgetId(appWidgetId) }
+        AppWidgetSnapshots.remove(appWidgetId)
     }
 
     /** Ids this host holds that the layout doesn't use anymore (e.g. an add that was interrupted). */
@@ -184,6 +186,25 @@ class ZflWidgetHostView(context: Context) : AppWidgetHostView(context) {
         return longPressed || super.onTouchEvent(event)
     }
 
+    /**
+     * Whether a scrollable view of the widget (a RemoteViews list or grid) under [x], [y]
+     * (px in this view) can still scroll in [direction] (positive = towards its end).
+     */
+    fun canScrollContentVertically(x: Float, y: Float, direction: Int): Boolean = canScrollAt(this, x, y, direction)
+
+    private fun canScrollAt(view: View, x: Float, y: Float, direction: Int): Boolean {
+        if (view !== this && view.canScrollVertically(direction)) return true
+        val group = view as? ViewGroup ?: return false
+        for (i in group.childCount - 1 downTo 0) {
+            val child = group.getChildAt(i)
+            if (child.visibility != View.VISIBLE) continue
+            val cx = x + view.scrollX - child.left
+            val cy = y + view.scrollY - child.top
+            if (cx >= 0 && cy >= 0 && cx < child.width && cy < child.height && canScrollAt(child, cx, cy, direction)) return true
+        }
+        return false
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         if (w == 0 || h == 0) return
@@ -193,16 +214,25 @@ class ZflWidgetHostView(context: Context) : AppWidgetHostView(context) {
 }
 
 /**
- * Last image of each hosted widget, taken on long press: the menu and drag show it, since
- * one widget id can't be shown live in two views at once.
+ * Last image of each hosted widget, taken on long press and while it rests in a stack: the
+ * menu, drag and stack swipes show it, since one widget id can't be shown live in two views
+ * at once. Bounded by bytes.
  */
 object AppWidgetSnapshots {
-    private val cache = LruCache<Int, ImageBitmap>(4)
+    private const val MAX_BYTES = 16 * 1024 * 1024
+
+    private val cache = object : LruCache<Int, ImageBitmap>(MAX_BYTES) {
+        override fun sizeOf(key: Int, value: ImageBitmap): Int = value.width * value.height * 4
+    }
 
     fun capture(appWidgetId: Int, view: View) {
-        if (view.width == 0 || view.height == 0) return
+        if (view.width == 0 || view.height == 0 || !view.isAttachedToWindow) return
         runCatching { view.drawToBitmap() }.getOrNull()?.let { cache.put(appWidgetId, it.asImageBitmap()) }
     }
 
     fun get(appWidgetId: Int): ImageBitmap? = cache.get(appWidgetId)
+
+    fun remove(appWidgetId: Int) {
+        cache.remove(appWidgetId)
+    }
 }

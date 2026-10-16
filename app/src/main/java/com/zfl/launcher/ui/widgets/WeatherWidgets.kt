@@ -48,7 +48,6 @@ import com.zfl.launcher.data.WidgetSize
 import com.zfl.launcher.data.displayTemperature
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle as JavaTextStyle
-import java.util.Locale
 
 private val Dim = Color.White.copy(alpha = 0.7f)
 private val Divider = Color.White.copy(alpha = 0.18f)
@@ -134,7 +133,7 @@ private const val HOURS_SHOWN = 6
 
 @Composable
 private fun DailyList(forecast: Forecast, fahrenheit: Boolean) {
-    val locale = Locale.getDefault()
+    val locale = currentLocale()
     Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         forecast.daily.forEach { day ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

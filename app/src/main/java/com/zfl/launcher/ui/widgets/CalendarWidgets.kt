@@ -17,10 +17,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,7 +69,7 @@ internal fun MonthWidget() {
 internal fun UpNextWidget() {
     val today = rememberToday()
     val environment = LocalWidgetEnvironment.current
-    val locale = Locale.getDefault()
+    val locale = currentLocale()
     Row(Modifier.fillMaxSize().padding(start = 16.dp, end = 14.dp, top = 14.dp, bottom = 14.dp)) {
         Column(Modifier.weight(1f).fillMaxHeight()) {
             Text(
@@ -98,7 +100,7 @@ private fun EventRow(event: CalendarEvent) {
         DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(event.begin))
     }
     val day = Instant.ofEpochMilli(event.begin).atZone(zone).toLocalDate()
-    val dayLabel = if (day == LocalDate.now(zone)) "" else day.dayOfWeek.getDisplayName(JavaTextStyle.SHORT, Locale.getDefault()) + " · "
+    val dayLabel = if (day == LocalDate.now(zone)) "" else day.dayOfWeek.getDisplayName(JavaTextStyle.SHORT, currentLocale()) + " · "
     Row(Modifier.padding(bottom = 6.dp)) {
         Box(
             Modifier
@@ -117,7 +119,7 @@ private fun EventRow(event: CalendarEvent) {
 /** Month name, weekday initials and day numbers, weeks starting on the locale's first day. */
 @Composable
 private fun MonthGrid(today: LocalDate, cellHeight: Dp, fontSize: TextUnit, modifier: Modifier = Modifier) {
-    val locale = Locale.getDefault()
+    val locale = currentLocale()
     val firstDay = WeekFields.of(locale).firstDayOfWeek
     val month = YearMonth.from(today)
     val cells = monthCells(month, firstDay)
@@ -162,7 +164,7 @@ private fun DayCell(text: String, height: Dp, fontSize: TextUnit, bold: Boolean 
 @Composable
 internal fun CalendarIcon(size: Dp) {
     val today = rememberToday()
-    val locale = Locale.getDefault()
+    val locale = currentLocale()
     Column(
         Modifier
             .size(size)
@@ -174,3 +176,8 @@ internal fun CalendarIcon(size: Dp) {
         Text(today.dayOfMonth.toString(), color = Color.Black, fontSize = (size.value * 0.42f).sp, lineHeight = (size.value * 0.44f).sp)
     }
 }
+
+/** The UI locale, read so that composables update when the user switches languages. */
+@Composable
+@ReadOnlyComposable
+internal fun currentLocale(): Locale = LocalConfiguration.current.locales[0]
