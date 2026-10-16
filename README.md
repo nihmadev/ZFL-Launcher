@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="ZFL Launcher logo" width="160" height="160">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png" alt="ZFL Launcher logo" width="160" height="160">
 </p>
 
 <h1 align="center">ZFL Launcher</h1>
