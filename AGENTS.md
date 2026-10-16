@@ -31,13 +31,6 @@ ZFL Launcher is a single-module Android app (`:app`) in Kotlin + Jetpack Compose
 - `ui/home/`: pager, grid, dock, icons, folders, edit mode, drag & drop. `ui/menu/`: long-press menu.
 - `ui/glass/`, `ui/shape/`, `ui/icon/`, `ui/theme/`: wallpaper blur and `Modifier.glass()`, squircle, icon rendering/cache, design tokens.
 - `ui/settings/`: iOS-style settings screens, components, and push navigation.
-- `docs/`: `DESIGN.md` (measured spec), `ARCHITECTURE.md`, `ROADMAP.md`, `reference/` (screenshots of the reference app).
-
-## Code map
-
-- `docs/ARCHITECTURE.md` is the navigation map (package table, glass pipeline, drag flow). Consult it before exploring directories.
-- Keep it current: when you add, remove, rename, or move a package, screen, or major class, or change the data flow (layout persistence, settings, glass, drag), update `ARCHITECTURE.md` in the same change. Keep it a map, not a description of internals.
-- When a roadmap item is finished or descoped, update `docs/ROADMAP.md`. Mark an item done only after it works on the device.
 
 ## Modularity and file size
 
@@ -51,24 +44,23 @@ ZFL Launcher is a single-module Android app (`:app`) in Kotlin + Jetpack Compose
 ## Features and correctness
 
 - A feature is ready when it works on the device in the real launcher, not when it appears in a `@Preview`.
-- Every interactive element must perform its stated action and change real, persisted state. Do not present empty handlers, fake values, decorative functional-looking buttons, or settings toggles that change nothing as completed features. Unimplemented settings are omitted or listed in `ROADMAP.md`, not shown as working.
+- Every interactive element must perform its stated action and change real, persisted state. Do not present empty handlers, fake values, decorative functional-looking buttons, or settings toggles that change nothing as completed features. Unimplemented settings are omitted, not shown as working.
 - Layout changes go through the pure operations in `data/LayoutModel` and are persisted via `LayoutRepository`; one user action produces one change and one save. Do not mutate layout state from several places.
 - Check applicable behavior: tap, long-press, drag, edit mode, back gesture/Home press, opening/closing overlays, app install/uninstall/update while the screen is open, configuration and wallpaper changes, process death and restore, font scale, RTL, display density, light and dark wallpapers, and Android 12 vs 13+ (permissions, blur).
 - Use stable keys in lazy lists and pagers (package + user, item id). Collect flows lifecycle-aware. Keep heavy work (package queries, icon loading, blur, file I/O) off the main thread.
 - Use Compose animation APIs and respect the system animator duration scale. Settled or invisible animations must not keep recomposing or invalidating draw.
 - Avoid allocations and state reads that trigger recomposition per frame; read fast-changing values (scroll, drag offset) in layout/draw phases.
 - Bitmaps and caches (icons, blurred wallpaper) must have bounded size and correct invalidation on app updates, icon-pack/custom-icon changes, and wallpaper changes.
-- Sizes, colors, radii, and durations come from `ui/theme/Tokens` and `docs/DESIGN.md`. Do not scatter magic numbers; add a token when the spec defines a new value.
-- Update the relevant docs. If behavior is missing, state the limitation explicitly instead of presenting the feature as complete.
+- Sizes, colors, radii, and durations come from `ui/theme/Tokens`. Do not scatter magic numbers; add a token when the spec defines a new value.
+- If behavior is missing, state the limitation explicitly instead of presenting the feature as complete.
 
 ## UI and previews
 
 - Screens show the feature and its controls. Do not add marketing copy, explanatory paragraphs, technical status text, debug counters, or filler. Diagnostics go to `Log` with a tag, not to the UI.
 - Do not add controls without real functionality. Sample data in `@Preview` is fine; it must not leak into the real launcher.
 - Use the existing components and styling (glass, squircle, settings components). Do not hand-draw substitutes or patch component bugs locally.
-- Match the reference: compare with the matching screenshot in `docs/reference/` and the measurements in `DESIGN.md`. Do not overwrite reference screenshots unless the task is to capture a new reference.
 - For visual changes, install on the device and inspect the result. A successful build is not visual verification.
-- Test device: POCO X5 over USB adb (Android 14, 1080×2400, density override 375). Capture screenshots with `adb exec-out screencap -p > build/screens/<name>.png` (outside `docs/`), and screen recordings with `adb shell screenrecord` for animations.
+- Test device: POCO X5 over USB adb (Android 14, 1080×2400, density override 375). Capture screenshots with `adb exec-out screencap -p > build/screens/<name>.png`, and screen recordings with `adb shell screenrecord` for animations.
 
 ## Validation
 
@@ -106,4 +98,4 @@ adb shell dumpsys gfxinfo com.zfl.launcher
 
 ## Completion criteria
 
-The feature works in the real launcher on the device, persists its state, and its docs agree with the behavior. Affected logic has tests; visual changes have been inspected on the device, or the lack of visual verification is explicitly reported. In the final response, distinguish builds, lint, unit tests, on-device checks, visual inspection, and measured performance.
+The feature works in the real launcher on the device, persists its state, and its docs (if any) agree with the behavior. Affected logic has tests; visual changes have been inspected on the device, or the lack of visual verification is explicitly reported. In the final response, distinguish builds, lint, unit tests, on-device checks, visual inspection, and measured performance.

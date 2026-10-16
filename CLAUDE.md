@@ -1,3 +1,1 @@
 See AGENTS.md
-
-@docs/ARCHITECTURE.md
