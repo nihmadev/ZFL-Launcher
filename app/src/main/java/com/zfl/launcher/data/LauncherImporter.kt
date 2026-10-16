@@ -6,8 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.os.UserManager
+import androidx.core.net.toUri
 import com.zfl.launcher.R
 
 /** A launcher whose Home Screen layout can be imported. */
@@ -128,7 +128,7 @@ class LauncherImporter(private val context: Context) {
     }
 
     private fun queryFavorites(authority: String): List<FavoriteRow> {
-        val uri = Uri.parse("content://$authority/favorites")
+        val uri = "content://$authority/favorites".toUri()
         val cursor = context.contentResolver.query(uri, null, null, null, null)
             ?: error("No layout data")
         return cursor.use { c -> buildList { while (c.moveToNext()) add(FavoriteRow.from(c)) } }
@@ -136,7 +136,7 @@ class LauncherImporter(private val context: Context) {
 
     /** Older Launcher3 versions keep page order in `workspaceScreens`; newer ones use the screen id. */
     private fun queryScreenOrder(authority: String): Map<Int, Int> = runCatching {
-        val uri = Uri.parse("content://$authority/workspaceScreens")
+        val uri = "content://$authority/workspaceScreens".toUri()
         context.contentResolver.query(uri, null, null, null, null)?.use { c ->
             val id = c.getColumnIndexOrThrow("_id")
             val rank = c.getColumnIndexOrThrow("screenRank")

@@ -45,9 +45,7 @@ import com.zfl.launcher.ui.glass.LocalGlassStyle
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.home.HomePreview
 import com.zfl.launcher.ui.icon.AppIconImage
-import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
-import com.zfl.launcher.ui.shape.IconShape
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
 
@@ -55,15 +53,15 @@ private val Defaults = SettingsState()
 
 /** Top bar button that restores the defaults of the current screen. */
 @Composable
-private fun ResetAction(onReset: () -> Unit) {
+internal fun ResetAction(onReset: () -> Unit) {
     GlassCircleButton(Icons.Rounded.Restore, stringResource(R.string.action_reset), onClick = onReset)
 }
 
-private fun percent(value: Float): String = "${(value * 100).roundToInt()}%"
+internal fun percent(value: Float): String = "${(value * 100).roundToInt()}%"
 
 /** A few apps for the previews (not the settings app itself). */
 @Composable
-private fun sampleApps(vm: SettingsViewModel, count: Int): List<AppInfo> {
+internal fun sampleApps(vm: SettingsViewModel, count: Int): List<AppInfo> {
     val apps by vm.repository.apps.collectAsStateWithLifecycle()
     val selfPackage = LocalContext.current.packageName
     return remember(apps) { apps.filter { it.packageName != selfPackage }.take(count) }
@@ -177,78 +175,6 @@ private fun GlassPreview(apps: List<AppInfo>, style: GlassStyle, blur: Boolean) 
                 apps.forEach { AppIconImage(it, size = 52.dp) }
             }
         }
-    }
-}
-
-// endregion
-
-// region Icons
-
-@Composable
-fun IconSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
-    val settings by vm.settings.state.collectAsStateWithLifecycle()
-    var scale by remember(settings.iconScale) { mutableFloatStateOf(settings.iconScale) }
-    var corner by remember(settings.iconCorner) { mutableFloatStateOf(settings.iconCorner) }
-    val apps = sampleApps(vm, 3)
-
-    SettingsPage(
-        title = stringResource(R.string.row_icons),
-        onBack = onBack,
-        action = {
-            ResetAction {
-                vm.settings.update {
-                    it.copy(iconScale = Defaults.iconScale, iconCorner = Defaults.iconCorner, showLabels = Defaults.showLabels)
-                }
-            }
-        },
-    ) {
-        item {
-            SettingsCard {
-                // Live preview at real size; the new shape is clipped on top until it is saved.
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(Tokens.IconSize * SettingsState.MAX_ICON_SCALE + 48.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    apps.forEach { app ->
-                        Column(Modifier.width(Tokens.IconSize * scale + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            AppIconImage(app, Modifier.clip(IconShape(corner)), size = Tokens.IconSize * scale)
-                            if (settings.showLabels) {
-                                Spacer(Modifier.height(6.dp))
-                                IconLabel(settings.customLabels[app.key] ?: app.label)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        item { Spacer(Modifier.height(16.dp)) }
-        item {
-            SettingsCard {
-                SliderRow(
-                    title = stringResource(R.string.icons_size),
-                    value = scale,
-                    valueText = percent(scale),
-                    onValueChange = { scale = it },
-                    onValueChangeFinished = { vm.settings.update { it.copy(iconScale = scale) } },
-                    valueRange = SettingsState.MIN_ICON_SCALE..SettingsState.MAX_ICON_SCALE,
-                )
-                SliderRow(
-                    title = stringResource(R.string.icons_corner),
-                    value = corner,
-                    valueText = percent(corner / SettingsState.MAX_ICON_CORNER),
-                    onValueChange = { corner = it },
-                    onValueChangeFinished = { vm.settings.update { it.copy(iconCorner = corner) } },
-                    valueRange = 0f..SettingsState.MAX_ICON_CORNER,
-                )
-                SwitchRow(stringResource(R.string.icons_labels), settings.showLabels, onCheckedChange = { value ->
-                    vm.settings.update { it.copy(showLabels = value) }
-                })
-            }
-        }
-        item { SectionFooter(stringResource(R.string.icons_footer)) }
     }
 }
 
