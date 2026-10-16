@@ -64,15 +64,18 @@ val DEFAULT_TODAY_WIDGETS: List<WidgetItem> = listOf(
     WidgetItem("widget-today-battery", WidgetKind.Battery, WidgetSize.Small),
 )
 
-/** Every widget anywhere in the layout, built-in or hosted. */
-fun LayoutData.allPageWidgets(): List<PageWidget> = pages.flatten().filterIsInstance<PageWidget>() + today
+/** Every widget anywhere in the layout, built-in or hosted, including stacks and the widgets inside them. */
+fun LayoutData.allPageWidgets(): List<PageWidget> = (pages.flatten().filterIsInstance<PageWidget>() + today).withStackItems()
+
+/** Ids of every hosted widget the layout uses, inside stacks too (anything else our host holds is an orphan). */
+fun LayoutData.usedAppWidgetIds(): Set<Int> = allPageWidgets().filterIsInstance<AppWidgetItem>().mapTo(mutableSetOf()) { it.appWidgetId }
 
 /** Every built-in widget anywhere in the layout. */
 fun LayoutData.allWidgets(): List<WidgetItem> = allPageWidgets().filterIsInstance<WidgetItem>()
 
 fun LayoutData.findWidget(id: String): PageWidget? = allPageWidgets().firstOrNull { it.id == id }
 
-/** Removes hosted widgets whose app is gone ([isAlive] false), e.g. after an uninstall. */
+/** Removes hosted widgets whose app is gone ([isAlive] false), e.g. after an uninstall; a stack only loses that widget. */
 fun LayoutData.withoutDeadAppWidgets(isAlive: (Int) -> Boolean, pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
     val dead = allPageWidgets().filterIsInstance<AppWidgetItem>().filterNot { isAlive(it.appWidgetId) }
     return if (dead.isEmpty()) this else dead.fold(this) { layout, w -> layout.without(w.id) }.normalized(pageCapacity, dockCapacity)
@@ -105,8 +108,14 @@ fun LayoutData.addWidget(widget: PageWidget, target: WidgetTarget, pageCapacity:
         }
     }
 
-/** Replaces the widget with the same id (new size or photo), re-flowing the pages. */
+/**
+ * Replaces the widget with the same id (new size or photo), re-flowing the pages. A widget
+ * inside a stack is replaced there; one that no longer fits the stack's size is dropped.
+ */
 fun LayoutData.updateWidget(widget: PageWidget, pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
+    stackHolding(widget.id)?.let { stack ->
+        return updateStack(stack.id, pageCapacity, dockCapacity) { s -> s.copy(items = s.items.map { if (it.id == widget.id) widget else it }) }
+    }
     fun swap(item: HomeItem): HomeItem = if (item.id == widget.id) widget else item
     val next = copy(
         pages = pages.map { page -> page.map(::swap) },

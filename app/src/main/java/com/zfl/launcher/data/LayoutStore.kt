@@ -3,9 +3,9 @@ package com.zfl.launcher.data
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
-import android.net.Uri
 import android.provider.MediaStore
 import androidx.core.content.edit
+import androidx.core.net.toUri
 import com.zfl.launcher.R
 import java.io.File
 
@@ -14,7 +14,7 @@ import java.io.File
  * A small JSON file is plenty for a few hundred items and keeps the project dependency-free.
  */
 class LayoutStore(private val context: Context) {
-    private val file = File(context.filesDir, "layout.json")
+    private val file = File(context.filesDir, FILE_NAME)
 
     /** The saved layout, or null on first launch. */
     fun load(): LayoutData? = file.takeIf { it.exists() }?.readText()?.let(LayoutData::fromJson)
@@ -49,8 +49,8 @@ class LayoutStore(private val context: Context) {
         val pm = context.packageManager
         val intents = listOf(
             Intent(Intent.ACTION_DIAL),
-            Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:")),
-            Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com")),
+            Intent(Intent.ACTION_SENDTO, "smsto:".toUri()),
+            Intent(Intent.ACTION_VIEW, "https://example.com".toUri()),
             Intent(MediaStore.ACTION_IMAGE_CAPTURE),
         )
         return intents.mapNotNull { intent ->
@@ -68,5 +68,12 @@ class LayoutStore(private val context: Context) {
         val category = app?.info?.applicationInfo?.category ?: ApplicationInfo.CATEGORY_UNDEFINED
         return ApplicationInfo.getCategoryTitle(context, category)?.toString()
             ?: context.getString(R.string.folder_default_name)
+    }
+
+    companion object {
+        private const val FILE_NAME = "layout.json"
+
+        /** Whether a Home Screen layout was ever saved on this install. */
+        fun hasSavedLayout(context: Context): Boolean = File(context.filesDir, FILE_NAME).exists()
     }
 }

@@ -41,6 +41,17 @@ data class AppWidgetEntry(
     override val span: Span,
 ) : PageWidgetEntry
 
+/** A Smart Stack ([WidgetStack]): built-in and hosted widgets of one size, [current] shown. */
+data class WidgetStackEntry(
+    override val id: String,
+    val size: WidgetSize,
+    val items: List<PageWidgetEntry>,
+    val current: Int,
+) : PageWidgetEntry {
+    override val span: Span get() = size.span
+    val currentItem: PageWidgetEntry get() = items[current.coerceIn(0, items.lastIndex)]
+}
+
 /** The empty slot that opens up under the finger while dragging, as big as the dragged item. */
 data class PlaceholderEntry(val span: Span = Span.One) : HomeEntry {
     override val id: String get() = "placeholder"
@@ -65,6 +76,8 @@ data class HomeState(
     val cells: Map<String, Int> = emptyMap(),
 ) {
     fun findEntry(id: String): HomeEntry? = (pages.flatten() + dock).firstOrNull { it.id == id }
+
+    fun findStack(id: String): WidgetStackEntry? = (pages.flatten() + today).firstOrNull { it.id == id } as? WidgetStackEntry
 }
 
 /**
@@ -77,7 +90,7 @@ data class HomeState(
 fun buildHomeLayout(layout: LayoutData, apps: List<AppInfo>, prefs: SettingsState, rows: Int = prefs.gridRows): HomeState {
     val byKey = apps.associateBy { it.key }
     fun app(key: String): AppInfo? = byKey[key]?.let { app ->
-        prefs.customLabels[key]?.let { AppInfo(app.info, it) } ?: app
+        prefs.customLabels[key]?.let(app::withLabel) ?: app
     }
     fun resolve(item: HomeItem): HomeEntry? = when (item) {
         is AppItem -> app(item.appKey)?.let(::AppEntry)
@@ -97,4 +110,5 @@ fun buildHomeLayout(layout: LayoutData, apps: List<AppInfo>, prefs: SettingsStat
 private fun PageWidget.toEntry(): PageWidgetEntry = when (this) {
     is WidgetItem -> WidgetEntry(id, kind, size, photo)
     is AppWidgetItem -> AppWidgetEntry(id, appWidgetId, provider, span)
+    is WidgetStack -> WidgetStackEntry(id, size, items.map { it.toEntry() }, current)
 }

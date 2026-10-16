@@ -97,11 +97,26 @@ data class LayoutData(
                 .put("provider", item.provider)
                 .put("cols", item.span.columns)
                 .put("rows", item.span.rows)
+            // "widget" + an unknown "kind" make builds without stacks skip this entry instead of
+            // failing to read the whole layout.
+            is WidgetStack -> JSONObject()
+                .put("stack", item.id)
+                .put("widget", item.id)
+                .put("kind", "stack")
+                .put("size", item.size.name)
+                .put("current", item.current)
+                .put("items", JSONArray(item.items.map(::itemToJson)))
         }
 
+        /** Entries this version can't read (from a newer one) are skipped, the rest is kept. */
         private fun JSONArray.toItems(): List<HomeItem> = List(length()) { i ->
-            val obj = getJSONObject(i)
+            val obj = optJSONObject(i) ?: return@List null
             when {
+                obj.has("stack") -> {
+                    val size = WidgetSize.entries.firstOrNull { it.name == obj.optString("size") } ?: return@List null
+                    val items = obj.optJSONArray("items")?.toItems()?.filterIsInstance<PageWidget>().orEmpty()
+                    WidgetStack(obj.getString("stack"), size, items, obj.optInt("current", 0)).normalizedStack()
+                }
                 obj.has("folder") -> {
                     val apps = obj.getJSONArray("apps")
                     FolderItem(obj.getString("folder"), obj.optString("name"), List(apps.length()) { apps.getString(it) })
@@ -118,7 +133,8 @@ data class LayoutData(
                     obj.getString("provider"),
                     Span(obj.optInt("cols", 4).coerceIn(1, 4), obj.optInt("rows", 2).coerceIn(1, 6)),
                 )
-                else -> AppItem(obj.getString("app"))
+                obj.has("app") -> AppItem(obj.getString("app"))
+                else -> null
             }
         }.filterNotNull()
     }
@@ -196,7 +212,7 @@ fun LayoutData.without(id: String): LayoutData {
         when {
             item.id == id -> null
             item is FolderItem && id in item.apps -> item.copy(apps = item.apps - id).simplified()
-            else -> item
+            else -> item.withoutStackItem(id)
         }
     }
     val nextPages = pages.map(::strip)
@@ -206,8 +222,14 @@ fun LayoutData.without(id: String): LayoutData {
         pages.flatten().filterIsInstance<FolderItem>().forEach { folder ->
             if (id in folder.apps && folder.apps.size == 2) cells[folder.id]?.let { put((folder.apps - id).single(), it) }
         }
+        // Likewise when a stack is left with one widget.
+        pages.flatten().filterIsInstance<WidgetStack>().forEach { stack ->
+            val rest = stack.withoutStackItem(id)
+            if (rest != null && rest.id != stack.id) cells[stack.id]?.let { put(rest.id, it) }
+        }
     }
-    return copy(pages = nextPages, dock = strip(dock), today = today.filter { it.id != id }, cells = nextCells)
+    val nextToday = today.mapNotNull { if (it.id == id) null else it.withoutStackItem(id) as PageWidget? }
+    return copy(pages = nextPages, dock = strip(dock), today = nextToday, cells = nextCells)
 }
 
 /** "Add to Home Screen" (from the App Library): appends the app to the last page. */
@@ -259,6 +281,10 @@ private fun LayoutData.moveUnchecked(
                 existing.copy(apps = apps)
             } else existing
         }
+    }
+    // A widget dropped on a widget of its size makes (or grows) a stack.
+    if (item is PageWidget && position is DropPosition.Merge) {
+        return dropOnWidget(item, position.targetId, "stack-${System.currentTimeMillis()}", pageCapacity, dockCapacity)
     }
     // Widgets live only on home pages: no dock, no folders.
     if (item is PageWidget && position !is DropPosition.Page) return this
