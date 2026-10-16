@@ -22,6 +22,8 @@ import com.zfl.launcher.data.GRID_COLUMNS
 import com.zfl.launcher.data.WidgetEntry
 import com.zfl.launcher.data.packCells
 import com.zfl.launcher.data.span
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.Haptics
 
 /** Side margin and the gap between widgets on the Today page, measured from iOS27L. */
 private val TodayMargin = 33.dp
@@ -41,12 +43,18 @@ internal fun TodayPage(
     onExitEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
     BoxWithConstraints(
         modifier
             .fillMaxSize()
             .pointerInput(editMode) {
                 detectTapGestures(
-                    onLongPress = { if (!editMode) onEnterEdit() },
+                    onLongPress = {
+                        if (!editMode) {
+                            haptic.performHapticFeedback(Haptics.Lift)
+                            onEnterEdit()
+                        }
+                    },
                     onTap = { if (editMode) onExitEdit() },
                 )
             },

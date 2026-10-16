@@ -18,6 +18,11 @@ import java.text.Collator
 class AppInfo(
     val info: LauncherActivityInfo,
     val label: String,
+    /**
+     * Changes whenever the system reports the package as added or changed (an update, a new
+     * icon), so icon caches don't keep showing the old icon. Only meaningful within one process.
+     */
+    val iconVersion: Int = 0,
 ) {
     val component: ComponentName get() = info.componentName
     val user: UserHandle get() = info.user
@@ -31,6 +36,9 @@ class AppInfo(
 
     /** Stable id used to persist the home screen layout. */
     val key: String = "${component.flattenToString()}#${info.user.hashCode()}"
+
+    /** The same app shown under another (custom) label. */
+    fun withLabel(label: String): AppInfo = AppInfo(info, label, iconVersion)
 }
 
 /**
@@ -44,13 +52,25 @@ class AppRepository(context: Context) {
     private val _apps = MutableStateFlow<List<AppInfo>>(emptyList())
     val apps: StateFlow<List<AppInfo>> = _apps
 
+    /** Package + user → [AppInfo.iconVersion]; touched only on the main thread. */
+    private val iconVersions = HashMap<String, Int>()
+
     private val callback = object : LauncherApps.Callback() {
         override fun onPackageRemoved(packageName: String, user: UserHandle) = reload()
-        override fun onPackageAdded(packageName: String, user: UserHandle) = reload()
-        override fun onPackageChanged(packageName: String, user: UserHandle) = reload()
-        override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = reload()
+        override fun onPackageAdded(packageName: String, user: UserHandle) = changed(listOf(packageName), user)
+        override fun onPackageChanged(packageName: String, user: UserHandle) = changed(listOf(packageName), user)
+        override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) =
+            changed(packageNames.asList(), user)
         override fun onPackagesUnavailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = reload()
     }
+
+    /** New icons may come with the changed packages: bump their version, then reload. */
+    private fun changed(packageNames: List<String>, user: UserHandle) {
+        packageNames.forEach { iconVersions.merge(versionKey(it, user), 1, Int::plus) }
+        reload()
+    }
+
+    private fun versionKey(packageName: String, user: UserHandle): String = "$packageName#${user.hashCode()}"
 
     init {
         launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
@@ -65,7 +85,7 @@ class AppRepository(context: Context) {
         val collator = Collator.getInstance()
         _apps.value = userManager.userProfiles
             .flatMap { launcherApps.getActivityList(null, it) }
-            .map { AppInfo(it, it.label.toString()) }
+            .map { AppInfo(it, it.label.toString(), iconVersions[versionKey(it.componentName.packageName, it.user)] ?: 0) }
             .sortedWith { a, b -> collator.compare(a.label, b.label) }
     }
 

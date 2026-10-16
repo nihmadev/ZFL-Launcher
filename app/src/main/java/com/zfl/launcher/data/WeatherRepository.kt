@@ -4,10 +4,12 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Address
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
+import android.os.Build
 import android.os.CancellationSignal
 import android.util.Log
 import androidx.core.content.edit
@@ -135,17 +137,21 @@ class WeatherRepository private constructor(context: Context) {
     private suspend fun placeName(location: Location): String {
         val fallback = _state.value.place?.name.orEmpty()
         if (!Geocoder.isPresent()) return fallback
+        fun name(address: Address?): String = address?.locality ?: address?.subAdminArea ?: address?.adminArea ?: fallback
         return withContext(Dispatchers.IO) {
             withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
-                suspendCancellableCoroutine { continuation ->
-                    Geocoder(appContext).getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
-                        override fun onGeocode(addresses: MutableList<android.location.Address>) {
-                            val address = addresses.firstOrNull()
-                            continuation.resume(address?.locality ?: address?.subAdminArea ?: address?.adminArea ?: fallback)
-                        }
-
-                        override fun onError(errorMessage: String?) = continuation.resume(fallback)
-                    })
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    suspendCancellableCoroutine { continuation ->
+                        Geocoder(appContext).getFromLocation(location.latitude, location.longitude, 1, object : Geocoder.GeocodeListener {
+                            override fun onGeocode(addresses: MutableList<Address>) = continuation.resume(name(addresses.firstOrNull()))
+                            override fun onError(errorMessage: String?) = continuation.resume(fallback)
+                        })
+                    }
+                } else {
+                    // Android 12 only has the blocking call; this already runs on the IO dispatcher.
+                    @Suppress("DEPRECATION")
+                    runCatching { Geocoder(appContext).getFromLocation(location.latitude, location.longitude, 1) }
+                        .getOrNull()?.firstOrNull().let(::name)
                 }
             } ?: fallback
         }
