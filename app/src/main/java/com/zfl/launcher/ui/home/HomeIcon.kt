@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -33,6 +32,7 @@ import com.zfl.launcher.data.PlaceholderEntry
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.settings.LocalSettingsState
+import com.zfl.launcher.ui.theme.Haptics
 
 /** What a [HomeIcon] reports back. Bounds and pointers are in window coordinates. */
 interface HomeIconCallbacks {
@@ -89,7 +89,7 @@ fun HomeIcon(
                     }
                     if ((change.position - start).getDistance() > viewConfiguration.touchSlop) {
                         change.consume()
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptic.performHapticFeedback(Haptics.Lift)
                         currentCallbacks.onDragStart(currentEntry, bounds, columnOrigin + change.position)
                         break
                     }
@@ -106,7 +106,7 @@ fun HomeIcon(
                 },
                 onTap = { currentCallbacks.onTap(currentEntry, bounds) },
                 onLongPress = { position ->
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    haptic.performHapticFeedback(Haptics.Lift)
                     currentCallbacks.onLongPress(currentEntry, bounds, columnOrigin + position)
                 },
             )

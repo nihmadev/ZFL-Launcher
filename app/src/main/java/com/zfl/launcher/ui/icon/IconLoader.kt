@@ -1,184 +1,243 @@
 package com.zfl.launcher.ui.icon
 
-import android.content.Context
+import android.app.WallpaperColors
+import android.app.WallpaperManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
-import android.graphics.Rect
-import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
+import android.os.Handler
+import android.os.Looper
 import android.util.LruCache
+import androidx.activity.ComponentActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
+import androidx.core.util.Consumer
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.settings.LauncherSettings
 import com.zfl.launcher.settings.SettingsState
 import com.zfl.launcher.ui.shape.iconOutline
+import com.zfl.launcher.ui.theme.Tokens
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 /**
  * Renders app icons into bitmaps of [baseSizePx] × the user's icon scale, already cut to the
- * user's icon shape (a squircle by default), so every icon
- * looks consistent and the UI draws them as plain images, with no per-frame clipping.
+ * user's icon shape (a squircle by default), with the glass edge highlight if enabled, and
+ * drawn in the user's [IconAppearance], so every
+ * icon looks consistent and the UI draws them as plain images, with no per-frame clipping or filters.
  *
- * - Adaptive icons: both layers are stretched so the visible 72/108 safe zone fills the square.
- * - Legacy icons: drawn with padding on a white plate, like iOS-style launchers do.
+ * The current [IconSpec] (size, shape, resolved style) follows the settings, the system night
+ * mode (for Auto) and the wallpaper colors (for Tinted "from wallpaper"). It is snapshot state:
+ * [AppIconImage] reads [cacheKey] and reloads only when its own key changes. Rendering happens
+ * off the main thread ([drawAdaptive], [drawLegacy], [drawCustom]).
  *
- * Results are kept in an in-memory LRU cache.
+ * Results are kept in an in-memory LRU cache bounded by bytes. Bitmaps of an outdated spec are
+ * dropped as soon as the spec changes.
  */
 class IconLoader(
-    private val context: Context,
+    activity: ComponentActivity,
     private val baseSizePx: Int,
     private val settings: LauncherSettings,
 ) {
-    // Bounded by bytes: bitmaps grow with the icon size setting.
+    private val resources = activity.resources
+
     private val cache = object : LruCache<String, ImageBitmap>(MAX_CACHE_BYTES) {
         override fun sizeOf(key: String, value: ImageBitmap): Int = value.width * value.height * 4
     }
 
-    /**
-     * Cache key of the icon currently shown for [app]. It changes when the user picks
-     * a custom icon, so callers can use it as a `remember` key to reload.
-     */
-    fun cacheKey(app: AppInfo): String {
-        val state = settings.state.value
-        val icon = state.customIcons[app.key]?.let { stamp -> "${app.key}@$stamp" } ?: app.key
-        // Size and shape are baked into the bitmap, so changing them renders new bitmaps.
-        return "$icon#${sizePx(state)}#${state.iconCorner}"
+    // Inputs of the spec; written on the main thread only.
+    @Volatile private var prefs: SettingsState = settings.state.value
+    private var nightMode: Boolean = activity.resources.configuration.isNightMode()
+    private var wallpaper: WallpaperTint? by mutableStateOf(null)
+
+    /** `null` while it waits for the wallpaper colors. Snapshot state, see the class docs. */
+    private var spec: IconSpec? by mutableStateOf(prefs.iconSpec(baseSizePx, nightMode, wallpaper))
+    private var customIcons: Map<String, Long> by mutableStateOf(prefs.customIcons)
+
+    /** Key suffixes of the current spec; renders of an older spec are not cached. */
+    @Volatile private var liveSuffixes: Set<String> = spec?.keySuffixes().orEmpty()
+
+    /** Tint the "from wallpaper" option gives at [saturation]; `null` while the wallpaper colors are loading. */
+    fun wallpaperTint(saturation: Float): Int? = wallpaper?.let { tintColor(it.color ?: DEFAULT_ICON_TINT, saturation) }
+
+    private val colorsListener = WallpaperManager.OnColorsChangedListener { colors: WallpaperColors?, which: Int ->
+        if (which and WallpaperManager.FLAG_SYSTEM != 0) setWallpaper(colors)
+    }
+    private val configListener = Consumer<Configuration> { config ->
+        nightMode = config.isNightMode()
+        refresh()
     }
 
-    private fun sizePx(state: SettingsState): Int = (baseSizePx * state.iconScale).roundToInt()
+    init {
+        val wallpapers = WallpaperManager.getInstance(activity)
+        activity.lifecycleScope.launch {
+            settings.state.collect { state ->
+                prefs = state
+                customIcons = state.customIcons
+                refresh()
+            }
+        }
+        activity.lifecycleScope.launch {
+            val colors = withContext(Dispatchers.IO) {
+                runCatching { wallpapers.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
+            }
+            // A change reported by the listener in the meantime is newer.
+            if (wallpaper == null) setWallpaper(colors)
+        }
+        // Only the home activity handles uiMode itself; others are recreated with a new loader.
+        activity.addOnConfigurationChangedListener(configListener)
+        wallpapers.addOnColorsChangedListener(colorsListener, Handler(Looper.getMainLooper()))
+        activity.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                activity.removeOnConfigurationChangedListener(configListener)
+                wallpapers.removeOnColorsChangedListener(colorsListener)
+            }
+        })
+    }
+
+    private fun setWallpaper(colors: WallpaperColors?) {
+        wallpaper = WallpaperTint(colors?.primaryColor?.toArgb())
+        refresh()
+    }
+
+    /** Recomputes the spec; on a change, drops the bitmaps that no longer match it. */
+    private fun refresh() {
+        val next = prefs.iconSpec(baseSizePx, nightMode, wallpaper)
+        if (next == spec) return
+        spec = next
+        // While waiting for the wallpaper, the shown bitmaps stay as they are.
+        val keep = next?.keySuffixes() ?: return
+        liveSuffixes = keep
+        cache.snapshot().keys.forEach { key -> if (keep.none(key::endsWith)) cache.remove(key) }
+    }
+
+    /**
+     * Cache key of the icon currently shown for [app], or `null` while the spec is not known yet.
+     * It changes with a custom icon, an app update or any setting baked into the bitmap, so
+     * callers can use it as an effect key to reload.
+     */
+    fun cacheKey(app: AppInfo): String? {
+        val spec = spec ?: return null
+        return iconCacheKey(app.key, app.iconVersion, customIcons[app.key], spec)
+    }
 
     /** Returns the icon if it is already rendered, without blocking. */
-    fun cached(app: AppInfo): ImageBitmap? = cache.get(cacheKey(app))
+    fun cached(app: AppInfo): ImageBitmap? = cacheKey(app)?.let(cache::get)
 
-    /** Returns the cached icon or renders it (custom image first, then the app's own icon) off the main thread. */
-    suspend fun load(app: AppInfo): ImageBitmap {
-        val key = cacheKey(app)
+    /**
+     * Returns the cached icon or renders it (custom image first, then the app's own icon) off
+     * the main thread. `null` while the spec is not known yet.
+     */
+    suspend fun load(app: AppInfo): ImageBitmap? {
+        val spec = spec ?: return null
+        val stamp = customIcons[app.key]
+        val key = iconCacheKey(app.key, app.iconVersion, stamp, spec)
         cache.get(key)?.let { return it }
         return withContext(Dispatchers.IO) {
-            val density = context.resources.displayMetrics.densityDpi
-            (loadCustom(app) ?: render(app.info.getIcon(density))).also { cache.put(key, it) }
+            val density = resources.displayMetrics.densityDpi
+            val icon = stamp?.let { loadCustom(app, spec) } ?: render(app.info.getIcon(density), spec)
+            if (liveSuffixes.any(key::endsWith)) cache.put(key, icon)
+            icon
         }
     }
 
-    private fun loadCustom(app: AppInfo): ImageBitmap? {
-        if (app.key !in settings.state.value.customIcons) return null
+    private fun loadCustom(app: AppInfo, spec: IconSpec): ImageBitmap? {
         val bitmap = BitmapFactory.decodeFile(settings.customIconFile(app.key).path) ?: return null
-        val sizePx = sizePx(settings.state.value)
-        val scaled = Bitmap.createScaledBitmap(bitmap, sizePx, sizePx, true)
-        // The decoded file may be immutable (and createScaledBitmap may return it as is).
-        val icon = if (scaled.isMutable) scaled else scaled.copy(Bitmap.Config.ARGB_8888, true)
-        return maskToSquircle(icon).asImageBitmap()
+        val s = spec.sizePx
+        val scaled = bitmap.scale(s, s)
+        // The decoded file may be immutable (and scaling to its own size returns it as is).
+        var icon = if (scaled.isMutable) scaled else scaled.copy(Bitmap.Config.ARGB_8888, true)
+        val style = spec.styleFor(custom = true)
+        if (style != IconStyle.Plain) {
+            val styled = createBitmap(s, s)
+            drawCustom(icon, Canvas(styled), s, style)
+            icon = styled
+        }
+        return finish(icon, spec)
     }
 
     fun clear(): Unit = cache.evictAll()
 
-    /** Renders any drawable into an icon-sized square bitmap. Also used for shortcut icons. */
-    fun render(drawable: Drawable): ImageBitmap {
-        val s = sizePx(settings.state.value)
-        val bitmap = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+    /** Renders any drawable into an icon-sized square bitmap in the current style. Also used for shortcut icons. */
+    fun render(drawable: Drawable): ImageBitmap =
+        render(drawable, spec ?: prefs.iconSpec(baseSizePx, nightMode, WallpaperTint(null)) ?: error("spec without wallpaper"))
+
+    private fun render(drawable: Drawable, spec: IconSpec): ImageBitmap {
+        val s = spec.sizePx
+        val bitmap = createBitmap(s, s)
         val canvas = Canvas(bitmap)
         if (drawable is AdaptiveIconDrawable) {
-            // Layers are 108x108 with a visible 72x72 center, so scale them by 1.5x.
-            val inset = s / 4
-            listOf(drawable.background, drawable.foreground).forEach { layer ->
-                layer ?: return@forEach
-                layer.setBounds(-inset, -inset, s + inset, s + inset)
-                layer.draw(canvas)
-            }
+            drawAdaptive(drawable, canvas, s, spec.style)
         } else {
-            renderLegacy(drawable, canvas, s)
+            drawLegacy(drawable, canvas, s, spec.style)
         }
-        return maskToSquircle(bitmap).asImageBitmap()
+        return finish(bitmap, spec)
+    }
+
+    /** Cuts the icon to its shape and adds the edge highlight. */
+    private fun finish(bitmap: Bitmap, spec: IconSpec): ImageBitmap {
+        maskToSquircle(bitmap, spec.corner)
+        if (spec.edge) drawEdge(bitmap, spec.corner)
+        return bitmap.asImageBitmap()
     }
 
     /** Clears everything outside the icon shape, with antialiased edges. */
-    private fun maskToSquircle(bitmap: Bitmap): Bitmap {
+    private fun maskToSquircle(bitmap: Bitmap, corner: Float) {
         val w = bitmap.width.toFloat()
         val h = bitmap.height.toFloat()
-        val outside = iconOutline(w, h, settings.state.value.iconCorner).asAndroidPath()
+        val outside = iconOutline(w, h, corner).asAndroidPath()
         outside.fillType = Path.FillType.INVERSE_WINDING
         val clear = Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) }
         Canvas(bitmap).drawPath(outside, clear)
-        return bitmap
     }
 
     /**
-     * Legacy (non-adaptive) icons come with their own baked-in shape. Many OEM icons
-     * (e.g. MIUI system apps) are already a filled rounded square: those are stretched
-     * edge to edge so our squircle clip replaces their shape, instead of showing an
-     * "icon inside an icon". Anything else (round, irregular, transparent) gets a white plate.
+     * The same top-lit stroke glass surfaces have ([com.zfl.launcher.ui.glass.glass]), kept just
+     * inside the outline so the icon itself and its size stay untouched.
      */
-    private fun renderLegacy(drawable: Drawable, canvas: Canvas, s: Int) {
-        val source = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
-        drawable.setBounds(0, 0, s, s)
-        drawable.draw(Canvas(source))
-        val pixels = IntArray(s * s).also { source.getPixels(it, 0, s, 0, 0, s, s) }
-
-        val box = opaqueBounds(pixels, s)
-        if (box != null && fillsBounds(pixels, s, box)) {
-            // Fill the background with the icon's own edge color to hide any slivers, then
-            // scale the shape slightly past the edges so its rounded corners get clipped away.
-            canvas.drawColor(pixels[(box.top + 2) * s + box.centerX()] or OPAQUE)
-            val scale = FULL_BLEED_SCALE * s / maxOf(box.width(), box.height())
-            val w = box.width() * scale
-            val h = box.height() * scale
-            val dst = RectF((s - w) / 2f, (s - h) / 2f, (s + w) / 2f, (s + h) / 2f)
-            canvas.drawBitmap(source, box, dst, Paint(Paint.FILTER_BITMAP_FLAG))
-        } else {
-            canvas.drawColor(Color.WHITE)
-            val pad = (s * 0.12f).toInt()
-            drawable.setBounds(pad, pad, s - pad, s - pad)
-            drawable.draw(canvas)
+    private fun drawEdge(bitmap: Bitmap, corner: Float) {
+        val width = Tokens.GlassStrokeWidth.value * resources.displayMetrics.density
+        val side = bitmap.width - width
+        val path = iconOutline(side, side, corner).asAndroidPath().apply { offset(width / 2, width / 2) }
+        val stroke = Tokens.GlassStroke
+        val colors = intArrayOf(
+            stroke.toArgb(),
+            stroke.copy(alpha = stroke.alpha * Tokens.GlassStrokeMidAlpha).toArgb(),
+            stroke.copy(alpha = stroke.alpha * Tokens.GlassStrokeBottomAlpha).toArgb(),
+        )
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = width
+            shader = LinearGradient(0f, 0f, 0f, bitmap.height.toFloat(), colors, floatArrayOf(0f, 0.5f, 1f), Shader.TileMode.CLAMP)
         }
-        source.recycle()
-    }
-
-    /** Bounding box of the mostly opaque pixels (ignores soft drop shadows). */
-    private fun opaqueBounds(pixels: IntArray, s: Int): Rect? {
-        var left = s; var top = s; var right = -1; var bottom = -1
-        for (y in 0 until s) for (x in 0 until s) {
-            if (pixels[y * s + x] ushr 24 > ALPHA_SOLID) {
-                if (x < left) left = x
-                if (x > right) right = x
-                if (y < top) top = y
-                if (y > bottom) bottom = y
-            }
-        }
-        return if (right < left) null else Rect(left, top, right + 1, bottom + 1)
-    }
-
-    /**
-     * True when the shape is a filled, roughly square tile. Probes points near the corners:
-     * they are inside a rounded square (corner radius up to ~30%) but outside a circle.
-     */
-    private fun fillsBounds(pixels: IntArray, s: Int, box: Rect): Boolean {
-        val aspect = box.width().toFloat() / box.height()
-        if (aspect !in 0.9f..1.1f || box.width() < s / 2) return false
-        val probes = listOf(0.1f to 0.1f, 0.9f to 0.1f, 0.1f to 0.9f, 0.9f to 0.9f, 0.5f to 0.5f, 0.5f to 0.03f, 0.03f to 0.5f)
-        return probes.all { (fx, fy) ->
-            val x = (box.left + fx * (box.width() - 1)).toInt()
-            val y = (box.top + fy * (box.height() - 1)).toInt()
-            pixels[y * s + x] ushr 24 > ALPHA_SOLID
-        }
+        Canvas(bitmap).drawPath(path, paint)
     }
 
     private companion object {
-        const val ALPHA_SOLID = 200
         /** About 300 icons at the default size. */
         const val MAX_CACHE_BYTES = 36 * 1024 * 1024
-        const val OPAQUE = 0xFF000000.toInt()
-        /** How far a legacy tile is scaled past the icon edges. */
-        const val FULL_BLEED_SCALE = 1.06f
     }
 }
+
+private fun Configuration.isNightMode(): Boolean =
+    uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES

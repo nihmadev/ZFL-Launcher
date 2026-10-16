@@ -32,8 +32,8 @@ import kotlin.math.roundToInt
 val LocalIconLoader = staticCompositionLocalOf<IconLoader> { error("IconLoader not provided") }
 
 /**
- * Just the icon image (the bitmap is already cut to a squircle by [IconLoader]). Loads
- * asynchronously. [dimmed] darkens it the way iOS does while the icon is pressed.
+ * Just the icon image (the bitmap is already cut to a squircle and styled by [IconLoader]).
+ * Loads asynchronously. [dimmed] darkens it the way iOS does while the icon is pressed.
  */
 @Composable
 fun AppIconImage(
@@ -43,12 +43,14 @@ fun AppIconImage(
     dimmed: Boolean = false,
 ) {
     val loader = LocalIconLoader.current
-    // Changes with a custom icon, the icon size or shape, which triggers a reload.
+    // Changes with a custom icon, an app update, the icon size, shape or appearance, which
+    // triggers a reload. Reading it subscribes this scope only, not its parents.
     val cacheKey = loader.cacheKey(app)
     val bitmap = remember(app.key) { mutableStateOf(loader.cached(app)) }
     LaunchedEffect(cacheKey) {
+        if (cacheKey == null) return@LaunchedEffect
         // The previous bitmap stays visible until the new one is ready: no blink on a restyle.
-        bitmap.value = loader.cached(app) ?: loader.load(app)
+        bitmap.value = loader.cached(app) ?: loader.load(app) ?: return@LaunchedEffect
     }
     val label = app.label
     Spacer(

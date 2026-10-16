@@ -74,6 +74,7 @@ import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
 import kotlinx.coroutines.launch
 import java.util.Locale
+import com.zfl.launcher.ui.theme.Motion
 
 /** What search reports back. */
 interface SearchCallbacks {
@@ -101,8 +102,8 @@ fun SearchOverlay(
     if (mode != null) lastMode = mode
     AnimatedVisibility(
         visible = mode != null,
-        enter = fadeIn() + slideInVertically { -it / 12 },
-        exit = fadeOut() + slideOutVertically { -it / 12 },
+        enter = fadeIn(Motion.fade()) + slideInVertically(Motion.expand()) { -it / 12 },
+        exit = fadeOut(Motion.fade()) + slideOutVertically(Motion.expand()) { -it / 12 },
     ) {
         var query by remember { mutableStateOf("") }
         val results = remember(query, apps) { search(apps, query) }

@@ -47,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -66,6 +65,8 @@ import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
+import com.zfl.launcher.ui.theme.Motion
+import com.zfl.launcher.ui.theme.Haptics
 
 /** What App Library icons report back. Bounds are in window coordinates. */
 interface LibraryCallbacks {
@@ -206,7 +207,7 @@ private fun LibraryIcon(app: AppInfo, size: Dp, callbacks: LibraryCallbacks, mod
                     },
                     onTap = { callbacks.onLaunch(currentApp, bounds) },
                     onLongPress = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        haptic.performHapticFeedback(Haptics.Lift)
                         callbacks.onLongPress(currentApp, bounds)
                     },
                 )
@@ -225,8 +226,8 @@ fun CategoryOverlay(category: LibraryCategory?, callbacks: LibraryCallbacks, onC
     BackHandler(enabled = category != null, onBack = onClose)
     AnimatedVisibility(
         visible = category != null,
-        enter = fadeIn() + scaleIn(initialScale = 0.92f),
-        exit = fadeOut() + scaleOut(targetScale = 0.92f),
+        enter = fadeIn(Motion.fade()) + scaleIn(Motion.expand(), initialScale = 0.92f),
+        exit = fadeOut(Motion.fade()) + scaleOut(Motion.expand(), targetScale = 0.92f),
     ) {
         val shown = last ?: return@AnimatedVisibility
         Box(
