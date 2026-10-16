@@ -4,6 +4,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.zfl.launcher.data.DEFAULT_DOCK_CAPACITY
 import com.zfl.launcher.data.DOCK_CAPACITY_OPTIONS
+import com.zfl.launcher.ui.icon.DEFAULT_ICON_TINT
+import com.zfl.launcher.ui.icon.IconAppearance
 import com.zfl.launcher.ui.theme.Tokens
 
 /** How home screen pages animate while swiping between them. */
@@ -47,6 +49,18 @@ data class SettingsState(
     val iconCorner: Float = DEFAULT_ICON_CORNER,
     /** Labels under home screen and folder icons. */
     val showLabels: Boolean = true,
+    /** Default, Dark, Tinted or Auto (Default/Dark following the system theme). */
+    val iconAppearance: IconAppearance = IconAppearance.Default,
+    /** Tinted icons take their hue from the wallpaper instead of [iconTintColor]. */
+    val iconTintFromWallpaper: Boolean = true,
+    /** Opaque ARGB color picked by the user for Tinted icons. */
+    val iconTintColor: Int = DEFAULT_ICON_TINT,
+    /** Saturation of the tint, 0 (white) to 1 (vivid). */
+    val iconTintSaturation: Float = DEFAULT_TINT_SATURATION,
+    /** Whether Dark and Tinted also restyle custom icons picked by the user. */
+    val tintCustomIcons: Boolean = true,
+    /** The glass edge highlight (as on the dock and menus) along every app icon, in every appearance. */
+    val iconEdge: Boolean = true,
 
     val showDock: Boolean = true,
     /** Favorite apps the dock holds, one of [DOCK_CAPACITY_OPTIONS]. */
@@ -68,6 +82,9 @@ data class SettingsState(
     val customLabels: Map<String, String> = emptyMap(),
     /** App key → version stamp of a custom icon image stored in [LauncherSettings.customIconFile]. */
     val customIcons: Map<String, Long> = emptyMap(),
+
+    /** The first-run setup was finished with "Get Started" (or the install predates it, see [isOnboardingNeeded]). */
+    val onboardingDone: Boolean = false,
 ) {
     /** The label multiplier that should actually be used. */
     val labelScale: Float get() = if (customTextSize) textScale else 1f
@@ -94,6 +111,8 @@ data class SettingsState(
         menuDim = menuDim.coerceIn(0f, MAX_MENU_DIM),
         iconScale = iconScale.coerceIn(MIN_ICON_SCALE, MAX_ICON_SCALE),
         iconCorner = iconCorner.coerceIn(0f, MAX_ICON_CORNER),
+        iconTintColor = iconTintColor or OPAQUE,
+        iconTintSaturation = if (iconTintSaturation.isNaN()) DEFAULT_TINT_SATURATION else iconTintSaturation.coerceIn(0f, 1f),
         dockSlots = dockSlots.coerceIn(DOCK_CAPACITY_OPTIONS.first(), DOCK_CAPACITY_OPTIONS.last()),
     )
 
@@ -113,6 +132,8 @@ data class SettingsState(
         const val MAX_ICON_SCALE = 1.25f
         const val DEFAULT_ICON_CORNER = 0.225f
         const val MAX_ICON_CORNER = 0.5f
+        const val DEFAULT_TINT_SATURATION = 0.7f
+        private const val OPAQUE = 0xFF000000.toInt()
 
         /** Vertical margin above and below the page pill. */
         val PILL_MARGIN: Dp = 10.dp

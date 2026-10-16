@@ -3,6 +3,8 @@ package com.zfl.launcher.settings
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import com.zfl.launcher.data.LayoutStore
+import com.zfl.launcher.ui.icon.IconAppearance
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
@@ -21,20 +23,28 @@ class LauncherSettings private constructor(context: Context) {
     private val appContext: Context = context.applicationContext
     private val prefs: SharedPreferences = appContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
+    init {
+        migrateOnboarding()
+    }
+
     private val _state = MutableStateFlow(read())
     val state: StateFlow<SettingsState> = _state
 
-    // Kept in a field: SharedPreferences only holds listeners weakly.
-    private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> _state.value = read() }
-
-    init {
-        prefs.registerOnSharedPreferenceChangeListener(listener)
+    /**
+     * Every write goes through this store, so it publishes the new state itself right after
+     * writing: one change, one emission. (A SharedPreferences listener is held only weakly and
+     * R8 strips a write-only field, so a listener silently stopped working after a GC in release.)
+     */
+    private fun write(block: SharedPreferences.Editor.() -> Unit) {
+        // apply() updates the in-memory values synchronously, so read() already sees them.
+        prefs.edit(action = block)
+        _state.value = read()
     }
 
     /** Applies [transform] to the current settings and saves the result (values are clamped to their ranges). */
     fun update(transform: (SettingsState) -> SettingsState) {
         val next = transform(_state.value).sanitized()
-        prefs.edit {
+        write {
             putBoolean(KEY_HIDE_NAV, next.hideNavigation)
             putBoolean(KEY_BLUR, next.blurEffect)
             putBoolean(KEY_CUSTOM_TEXT, next.customTextSize)
@@ -51,6 +61,12 @@ class LauncherSettings private constructor(context: Context) {
             putFloat(KEY_ICON_SCALE, next.iconScale)
             putFloat(KEY_ICON_CORNER, next.iconCorner)
             putBoolean(KEY_SHOW_LABELS, next.showLabels)
+            putString(KEY_ICON_APPEARANCE, next.iconAppearance.name)
+            putBoolean(KEY_ICON_TINT_WALLPAPER, next.iconTintFromWallpaper)
+            putInt(KEY_ICON_TINT_COLOR, next.iconTintColor)
+            putFloat(KEY_ICON_TINT_SATURATION, next.iconTintSaturation)
+            putBoolean(KEY_TINT_CUSTOM_ICONS, next.tintCustomIcons)
+            putBoolean(KEY_ICON_EDGE, next.iconEdge)
             putBoolean(KEY_SHOW_DOCK, next.showDock)
             putInt(KEY_DOCK_SLOTS, next.dockSlots)
             putBoolean(KEY_DOCK_BACKGROUND, next.dockBackground)
@@ -58,7 +74,25 @@ class LauncherSettings private constructor(context: Context) {
             putString(KEY_SEARCH_SWIPE, next.searchSwipe.name)
             putBoolean(KEY_APP_LIBRARY, next.appLibrary)
             putStringSet(KEY_HIDDEN_MENU, next.hiddenMenuActions.map { it.name }.toSet())
+            putBoolean(KEY_ONBOARDING_DONE, next.onboardingDone)
         }
+    }
+
+    /** "Get Started" on the last onboarding step: the setup is never shown again. */
+    fun completeOnboarding(): Unit = update { it.copy(onboardingDone = true) }
+
+    /**
+     * Stores whether this install still needs the onboarding the first time the store is
+     * created, so users updating from a version without it skip it (see [isOnboardingNeeded]).
+     */
+    private fun migrateOnboarding() {
+        if (prefs.contains(KEY_ONBOARDING_DONE)) return
+        val needed = isOnboardingNeeded(
+            storedDone = null,
+            hasSavedSettings = prefs.all.isNotEmpty(),
+            hasSavedLayout = LayoutStore.hasSavedLayout(appContext),
+        )
+        prefs.edit { putBoolean(KEY_ONBOARDING_DONE, !needed) }
     }
 
     fun setHideNavigation(value: Boolean): Unit = update { it.copy(hideNavigation = value) }
@@ -76,14 +110,14 @@ class LauncherSettings private constructor(context: Context) {
 
     fun setAppHidden(appKey: String, hidden: Boolean) {
         val next = _state.value.hiddenApps.let { if (hidden) it + appKey else it - appKey }
-        prefs.edit { putStringSet(KEY_HIDDEN, next) }
+        write { putStringSet(KEY_HIDDEN, next) }
     }
 
     /** Sets a custom label, or restores the original one when [label] is null or blank. */
     fun setCustomLabel(appKey: String, label: String?) {
         val next = _state.value.customLabels.toMutableMap()
         if (label.isNullOrBlank()) next.remove(appKey) else next[appKey] = label.trim()
-        prefs.edit { putString(KEY_LABELS, JSONObject(next as Map<*, *>).toString()) }
+        write { putString(KEY_LABELS, JSONObject(next as Map<*, *>).toString()) }
     }
 
     /** Where the custom icon image of an app is stored (it may not exist). */
@@ -93,13 +127,13 @@ class LauncherSettings private constructor(context: Context) {
     /** Call after writing [customIconFile]; bumps the version so every icon cache reloads it. */
     fun markCustomIconChanged(appKey: String) {
         val next = _state.value.customIcons + (appKey to System.currentTimeMillis())
-        prefs.edit { putString(KEY_ICONS, JSONObject(next as Map<*, *>).toString()) }
+        write { putString(KEY_ICONS, JSONObject(next as Map<*, *>).toString()) }
     }
 
     fun resetCustomIcon(appKey: String) {
         customIconFile(appKey).delete()
         val next = _state.value.customIcons - appKey
-        prefs.edit { putString(KEY_ICONS, JSONObject(next as Map<*, *>).toString()) }
+        write { putString(KEY_ICONS, JSONObject(next as Map<*, *>).toString()) }
     }
 
     private fun read(): SettingsState = readRaw().sanitized()
@@ -123,6 +157,12 @@ class LauncherSettings private constructor(context: Context) {
         iconScale = prefs.getFloat(KEY_ICON_SCALE, Defaults.iconScale),
         iconCorner = prefs.getFloat(KEY_ICON_CORNER, Defaults.iconCorner),
         showLabels = prefs.getBoolean(KEY_SHOW_LABELS, Defaults.showLabels),
+        iconAppearance = IconAppearance.fromStored(prefs.getString(KEY_ICON_APPEARANCE, null)),
+        iconTintFromWallpaper = prefs.getBoolean(KEY_ICON_TINT_WALLPAPER, Defaults.iconTintFromWallpaper),
+        iconTintColor = prefs.getInt(KEY_ICON_TINT_COLOR, Defaults.iconTintColor),
+        iconTintSaturation = prefs.getFloat(KEY_ICON_TINT_SATURATION, Defaults.iconTintSaturation),
+        tintCustomIcons = prefs.getBoolean(KEY_TINT_CUSTOM_ICONS, Defaults.tintCustomIcons),
+        iconEdge = prefs.getBoolean(KEY_ICON_EDGE, Defaults.iconEdge),
         showDock = prefs.getBoolean(KEY_SHOW_DOCK, Defaults.showDock),
         dockSlots = prefs.getInt(KEY_DOCK_SLOTS, Defaults.dockSlots),
         dockBackground = prefs.getBoolean(KEY_DOCK_BACKGROUND, Defaults.dockBackground),
@@ -137,6 +177,7 @@ class LauncherSettings private constructor(context: Context) {
         hiddenApps = prefs.getStringSet(KEY_HIDDEN, emptySet()).orEmpty().toSet(),
         customLabels = readJsonMap(KEY_LABELS) { obj, key -> obj.getString(key) },
         customIcons = readJsonMap(KEY_ICONS) { obj, key -> obj.getLong(key) },
+        onboardingDone = prefs.getBoolean(KEY_ONBOARDING_DONE, Defaults.onboardingDone),
     )
 
     private fun <T> readJsonMap(prefKey: String, value: (JSONObject, String) -> T): Map<String, T> {
@@ -167,6 +208,12 @@ class LauncherSettings private constructor(context: Context) {
         private const val KEY_ICON_SCALE = "icon_scale"
         private const val KEY_ICON_CORNER = "icon_corner"
         private const val KEY_SHOW_LABELS = "show_labels"
+        private const val KEY_ICON_APPEARANCE = "icon_appearance"
+        private const val KEY_ICON_TINT_WALLPAPER = "icon_tint_wallpaper"
+        private const val KEY_ICON_TINT_COLOR = "icon_tint_color"
+        private const val KEY_ICON_TINT_SATURATION = "icon_tint_saturation"
+        private const val KEY_TINT_CUSTOM_ICONS = "tint_custom_icons"
+        private const val KEY_ICON_EDGE = "icon_edge"
         private const val KEY_SHOW_DOCK = "show_dock"
         private const val KEY_DOCK_SLOTS = "dock_slots"
         private const val KEY_DOCK_BACKGROUND = "dock_background"
@@ -175,6 +222,7 @@ class LauncherSettings private constructor(context: Context) {
         private const val KEY_SEARCH_SWIPE = "search_swipe"
         private const val KEY_APP_LIBRARY = "app_library"
         private const val KEY_HIDDEN_MENU = "hidden_menu_actions"
+        private const val KEY_ONBOARDING_DONE = "onboarding_done"
 
         @Volatile
         private var instance: LauncherSettings? = null

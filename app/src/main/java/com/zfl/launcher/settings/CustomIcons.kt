@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
+import androidx.core.graphics.scale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.min
@@ -32,7 +33,7 @@ suspend fun importCustomIcon(context: Context, settings: LauncherSettings, appKe
             }
             val side = min(decoded.width, decoded.height)
             val square = Bitmap.createBitmap(decoded, (decoded.width - side) / 2, (decoded.height - side) / 2, side, side)
-            val icon = Bitmap.createScaledBitmap(square, CUSTOM_ICON_SIZE, CUSTOM_ICON_SIZE, true)
+            val icon = square.scale(CUSTOM_ICON_SIZE, CUSTOM_ICON_SIZE)
 
             val file = settings.customIconFile(appKey)
             file.parentFile?.mkdirs()
