@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same as the platform default: the layout and settings are included in the user's own device
+     backup and device-to-device transfer. Nothing is sent anywhere by the launcher itself. -->
+<data-extraction-rules>
+    <cloud-backup />
+    <device-transfer />
+</data-extraction-rules>
