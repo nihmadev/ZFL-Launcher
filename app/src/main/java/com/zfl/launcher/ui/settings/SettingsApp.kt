@@ -3,8 +3,6 @@ package com.zfl.launcher.ui.settings
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -48,17 +46,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zfl.launcher.R
 import com.zfl.launcher.ui.glass.LocalGlassSource
+import com.zfl.launcher.ui.onboarding.OnboardingFlow
+import com.zfl.launcher.ui.onboarding.OnboardingMode
 import kotlin.math.roundToInt
+import com.zfl.launcher.ui.theme.Motion
 
 /** Screens of the settings app. */
 enum class SettingsRoute {
     Main, General, Grid, Transition, Animations, Glass, Icons, HomeScreen, ContextMenu,
-    HiddenApps, AppIcons, AppNames, License, Import, Weather,
+    HiddenApps, AppIcons, AppNames, License, Import, Weather, FinishSetup,
 }
-
-/** iOS navigation curve: fast start, long soft landing. */
-private val IosEasing = CubicBezierEasing(0.2f, 0.9f, 0.25f, 1f)
-private const val PUSH_DURATION_MS = 420
 
 /**
  * Root of the settings UI: a simple back stack with iOS "push" transitions.
@@ -94,13 +91,15 @@ fun SettingsApp(vm: SettingsViewModel, actions: SettingsActions, initialRoute: S
             SettingsRoute.License -> LicenseScreen(back)
             SettingsRoute.Import -> ImportScreen(vm, back)
             SettingsRoute.Weather -> WeatherSettingsScreen(back)
+            SettingsRoute.FinishSetup -> OnboardingFlow(vm, actions, OnboardingMode.FinishSetup, onFinish = back)
         }
     }
 }
 
-private fun pushTransition(isPush: Boolean): ContentTransform {
-    val slide = tween<IntOffset>(PUSH_DURATION_MS, easing = IosEasing)
-    val fade = tween<Float>(PUSH_DURATION_MS, easing = IosEasing)
+/** iOS push (or pop when ![isPush]); also used between onboarding steps. */
+internal fun pushTransition(isPush: Boolean): ContentTransform {
+    val slide = Motion.push<IntOffset>()
+    val fade = Motion.push<Float>()
     return if (isPush) {
         (slideInHorizontally(slide) { it } togetherWith
             (slideOutHorizontally(slide) { -it / 4 } + fadeOut(fade, targetAlpha = 0.4f)))

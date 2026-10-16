@@ -18,13 +18,31 @@ import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.ViewCarousel
 import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zfl.launcher.R
 import com.zfl.launcher.settings.PageTransition
+import com.zfl.launcher.ui.onboarding.finishSetupItems
+import com.zfl.launcher.ui.onboarding.setupState
+import com.zfl.launcher.ui.theme.Tokens
 
 /** First settings page: the list of sections, like the iOS27L "Settings" screen. */
 @Composable
@@ -32,7 +50,13 @@ fun MainSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, navigate
     val settings by vm.settings.state.collectAsStateWithLifecycle()
     val locale = LocalConfiguration.current.locales[0]
 
+    val unfinished = finishSetupItems(actions.setupState(hasImportSources = null)).size
+
     SettingsPage(title = stringResource(R.string.settings_title), onBack = null) {
+        if (unfinished > 0) {
+            item { Spacer(Modifier.height(16.dp)) }
+            item { FinishSetupRow(unfinished, onClick = { navigate(SettingsRoute.FinishSetup) }) }
+        }
         item { SectionHeader(stringResource(R.string.section_general)) }
         item {
             SettingsCard {
@@ -106,6 +130,27 @@ fun MainSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, navigate
                 NavRow(Icons.Rounded.Info, stringResource(R.string.row_version), onClick = {}, value = actions.versionName, showChevron = false)
                 NavRow(Icons.Rounded.Gavel, stringResource(R.string.row_license), onClick = { navigate(SettingsRoute.License) }, value = "GPL-3.0+")
             }
+        }
+    }
+}
+
+/** iOS "Finish Setting Up" row with a red badge: the onboarding steps the user skipped. */
+@Composable
+private fun FinishSetupRow(count: Int, onClick: () -> Unit) {
+    SettingsCard {
+        SettingsRow(onClick = onClick) {
+            RowTitle(stringResource(R.string.finish_setup_title), modifier = Modifier.weight(1f))
+            Box(
+                Modifier
+                    .defaultMinSize(minWidth = 24.dp, minHeight = 24.dp)
+                    .background(Tokens.Destructive, CircleShape)
+                    .padding(horizontal = 7.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(count.toString(), color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            }
+            Spacer(Modifier.width(6.dp))
+            Chevron()
         }
     }
 }

@@ -9,11 +9,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.app.ActivityOptions
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
+import androidx.core.net.toUri
 import com.zfl.launcher.data.WidgetTarget
 import android.app.SearchManager
 import android.app.WallpaperColors
 import android.app.WallpaperManager
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.graphics.Color
@@ -36,6 +39,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.setContent
 import com.zfl.launcher.data.AppInfo
+import com.zfl.launcher.settings.AppLanguage
 import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.ui.glass.GlassStyle
 import com.zfl.launcher.ui.glass.LocalGlassSource
@@ -81,6 +85,10 @@ class MainActivity : ComponentActivity(), LauncherActions {
         vm.refreshWallpaper(force = true)
     }
 
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLanguage.wrap(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
@@ -118,6 +126,11 @@ class MainActivity : ComponentActivity(), LauncherActions {
 
     override fun onResume() {
         super.onResume()
+        // Android 12: the language was changed in settings while the home screen was paused.
+        if (AppLanguage.isStale(this)) {
+            recreate()
+            return
+        }
         // Cheap when nothing changed; also picks up a freshly granted file access permission.
         vm.refreshWallpaper()
         vm.refreshWidgets()
@@ -184,7 +197,7 @@ class MainActivity : ComponentActivity(), LauncherActions {
     override fun webSearch(query: String) {
         val intent = Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, query)
         runCatching { startActivity(intent) }
-            .onFailure { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://duckduckgo.com/?q=" + Uri.encode(query)))) } }
+            .onFailure { runCatching { startActivity(Intent(Intent.ACTION_VIEW, ("https://duckduckgo.com/?q=" + Uri.encode(query)).toUri())) } }
     }
 
     override fun launch(app: AppInfo, bounds: Rect) {
@@ -210,11 +223,11 @@ class MainActivity : ComponentActivity(), LauncherActions {
     }
 
     override fun uninstall(app: AppInfo) {
-        startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.packageName}")))
+        startActivity(Intent(Intent.ACTION_DELETE, "package:${app.packageName}".toUri()))
     }
 
     override fun requestGlassAccess() {
-        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName"))
+        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, "package:$packageName".toUri())
         runCatching { startActivity(intent) }
             .onFailure { startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
     }
@@ -282,9 +295,15 @@ class MainActivity : ComponentActivity(), LauncherActions {
         val info = vm.appWidgets.info(pending.appWidgetId) ?: return cancelWidget(pending)
         val optional = info.widgetFeatures and AppWidgetProviderInfo.WIDGET_FEATURE_CONFIGURATION_OPTIONAL != 0
         if (info.configure != null && !optional) {
-            // The system starts the (possibly non-exported) configure activity for us.
+            // The system starts the (possibly non-exported) configure activity for us, through a
+            // PendingIntent; Android 14 blocks that start unless we, the visible sender, allow it.
+            val options = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                ActivityOptions.makeBasic()
+                    .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                    .toBundle()
+            } else null
             runCatching {
-                vm.appWidgets.host.startAppWidgetConfigureActivityForResult(this, pending.appWidgetId, 0, REQUEST_CONFIGURE_WIDGET, null)
+                vm.appWidgets.host.startAppWidgetConfigureActivityForResult(this, pending.appWidgetId, 0, REQUEST_CONFIGURE_WIDGET, options)
             }.onFailure { cancelWidget(pending) }
             return
         }

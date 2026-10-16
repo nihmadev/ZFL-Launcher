@@ -6,7 +6,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -47,6 +46,10 @@ import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.settings.SettingsState
 import com.zfl.launcher.ui.glass.LocalGlassSource
 import com.zfl.launcher.ui.library.AppLibraryPage
+import com.zfl.launcher.ui.theme.Motion
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.Haptics
 
 /** Actions that need an Activity: launching apps and opening system screens. */
 interface LauncherActions {
@@ -108,6 +111,12 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
         )
     }
 
+    // A tick when a dragged item is about to make (or join) a folder or a stack.
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(drag) {
+        snapshotFlow { drag.mergeArmed }.collect { armed -> if (armed) haptic.performHapticFeedback(Haptics.Tick) }
+    }
+
     // While dragging, show the layout with a gap where the item would land.
     val pages = if (drag.isDragging) drag.previewPages() else state.pages
     val dock = if (drag.isDragging) drag.previewDock() else state.dock
@@ -133,8 +142,10 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
 
     LaunchedEffect(Unit) {
         vm.homePressed.collect {
-            val overlay = vm.openFolder.value != null || vm.search.value != null || vm.openCategory.value != null
+            val overlay = vm.openFolder.value != null || vm.search.value != null || vm.openCategory.value != null ||
+                vm.stacks.editing.value != null
             if (vm.editMode.value || overlay || vm.widgetGallery.value) {
+                vm.stacks.closeEditor()
                 vm.closeFolder()
                 vm.exitEditMode()
                 vm.closeSearch()
@@ -167,7 +178,7 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
         vm.returnedHome.collect {
             if (!resumeEnabled) return@collect
             resume.snapTo(0f)
-            resume.animateTo(1f, spring(dampingRatio = 0.85f, stiffness = 300f))
+            resume.animateTo(1f, Motion.expand())
         }
     }
 
@@ -175,12 +186,12 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     val overlayOpen = menu != null || openFolder != null || search != null || openCategoryId != null || gallery
     val blur = animateFloatAsState(
         if (overlayOpen && settings.homeBlur) 1f else 0f,
-        spring(stiffness = 400f),
+        Motion.fade(),
         label = "blur",
     )
     val homeLayer = rememberGraphicsLayer()
     // Edit mode hides the status bar and shows the Edit/Done bar: the grid moves down a bit.
-    val editInset by animateDpAsState(if (editMode) 44.dp else 0.dp, spring(stiffness = 500f), label = "editInset")
+    val editInset by animateDpAsState(if (editMode) 44.dp else 0.dp, Motion.settle(), label = "editInset")
     val liftedId = menu?.entry?.id
 
     CompositionLocalProvider(LocalWidgetEnvironment provides widgetEnvironment) {
@@ -333,6 +344,7 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
             widgetMenu = widgetMenu,
             onAddWidget = { kind, size -> vm.addWidget(kind, size, widgetTarget()) },
             onAddAppWidget = { info -> actions.addAppWidget(info, widgetTarget()) },
+            onAddStack = { size -> vm.addSmartStack(size, widgetTarget()) },
         )
 
         DraggedIcon(drag)

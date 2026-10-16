@@ -3,7 +3,6 @@ package com.zfl.launcher.ui.settings
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -58,6 +57,9 @@ import androidx.compose.ui.unit.sp
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.Haptics
+import com.zfl.launcher.ui.theme.Motion
 
 /** Colors and sizes of the settings screens, measured from the iOS27L reference (docs/DESIGN.md). */
 object SettingsStyle {
@@ -203,7 +205,8 @@ fun Chevron() {
 /** Row with a title, an optional description and an iOS switch. Tapping anywhere toggles it. */
 @Composable
 fun SwitchRow(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, description: String? = null) {
-    SettingsRow(onClick = { onCheckedChange(!checked) }) {
+    val toggle = withToggleHaptic(onCheckedChange)
+    SettingsRow(onClick = { toggle(!checked) }) {
         Column(Modifier.weight(1f)) {
             RowTitle(title)
             if (description != null) {
@@ -225,12 +228,23 @@ fun CheckRow(title: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+/** Wraps a switch callback so every toggle by the user is felt, on or off. */
+@Composable
+private fun withToggleHaptic(onCheckedChange: (Boolean) -> Unit): (Boolean) -> Unit {
+    val haptic = LocalHapticFeedback.current
+    val current by rememberUpdatedState(onCheckedChange)
+    return remember(haptic) {
+        { value -> haptic.performHapticFeedback(if (value) Haptics.ToggleOn else Haptics.ToggleOff); current(value) }
+    }
+}
+
 /** iOS-style switch: 51×31dp pill with a sliding white knob and a spring animation. */
 @Composable
 fun IosSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boolean = true) {
+    val toggle = withToggleHaptic(onCheckedChange)
     val progress by animateFloatAsState(
         targetValue = if (checked) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = 500f),
+        animationSpec = Motion.control(),
         label = "switch",
     )
     val travelPx = with(LocalDensity.current) { 20.dp.toPx() }
@@ -240,7 +254,7 @@ fun IosSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit, enabled: Boo
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
             .clip(CircleShape)
             .background(lerp(SettingsStyle.SwitchOff, SettingsStyle.SwitchOn, progress))
-            .clickable(enabled = enabled, interactionSource = null, indication = null) { onCheckedChange(!checked) }
+            .clickable(enabled = enabled, interactionSource = null, indication = null) { toggle(!checked) }
             .padding(2.dp),
     ) {
         Box(
@@ -358,6 +372,7 @@ fun SliderRow(
 /** iOS segmented control with a sliding highlight. */
 @Composable
 fun SegmentedControl(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val haptic = LocalHapticFeedback.current
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -367,10 +382,11 @@ fun SegmentedControl(options: List<String>, selectedIndex: Int, onSelect: (Int) 
             .padding(3.dp),
     ) {
         val segment = maxWidth / options.size
-        val indicatorX by animateDpAsState(segment * selectedIndex, spring(dampingRatio = 0.8f, stiffness = 500f), label = "segment")
+        val indicatorX by animateDpAsState(segment * selectedIndex, Motion.control(), label = "segment")
         Box(
             Modifier
-                .offset(x = indicatorX)
+                // Read in the layout phase: the sliding highlight doesn't recompose every frame.
+                .offset { IntOffset(indicatorX.roundToPx(), 0) }
                 .width(segment)
                 .fillMaxHeight()
                 .shadow(2.dp, CircleShape)
@@ -385,7 +401,10 @@ fun SegmentedControl(options: List<String>, selectedIndex: Int, onSelect: (Int) 
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable(interactionSource = null, indication = null) { onSelect(index) },
+                        .clickable(interactionSource = null, indication = null) {
+                            if (index != selectedIndex) haptic.performHapticFeedback(Haptics.Tick)
+                            onSelect(index)
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(label, color = color, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
@@ -400,7 +419,7 @@ fun SegmentedControl(options: List<String>, selectedIndex: Int, onSelect: (Int) 
 fun GlassCircleButton(icon: ImageVector, contentDescription: String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) 0.9f else 1f, spring(stiffness = 600f), label = "press")
+    val scale by animateFloatAsState(if (pressed) 0.9f else 1f, Motion.press(), label = "press")
     Box(
         modifier
             .size(42.dp)

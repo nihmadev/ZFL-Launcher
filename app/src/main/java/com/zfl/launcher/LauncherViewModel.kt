@@ -4,7 +4,7 @@ import android.app.Application
 import android.appwidget.AppWidgetProviderInfo
 import com.zfl.launcher.data.AppWidgetItem
 import com.zfl.launcher.data.Span
-import com.zfl.launcher.data.allPageWidgets
+import com.zfl.launcher.data.usedAppWidgetIds
 import com.zfl.launcher.data.withoutDeadAppWidgets
 import com.zfl.launcher.ui.widgets.AppWidgets
 import android.net.Uri
@@ -21,6 +21,10 @@ import com.zfl.launcher.data.allWidgets
 import com.zfl.launcher.data.findWidget
 import com.zfl.launcher.data.removeWidget
 import com.zfl.launcher.data.updateWidget
+import com.zfl.launcher.data.PageWidget
+import com.zfl.launcher.data.WidgetStack
+import com.zfl.launcher.data.resizedTo
+import com.zfl.launcher.data.smartStack
 import com.zfl.launcher.ui.widgets.WidgetEnvironment
 import android.content.pm.ShortcutInfo
 import androidx.compose.ui.geometry.Rect
@@ -108,7 +112,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Visible (not hidden) apps with custom labels applied, alphabetically. Used by search. */
     val visibleApps: StateFlow<List<AppInfo>> = combine(repository.apps, settings.state) { apps, prefs ->
         apps.filter { it.key !in prefs.hiddenApps }
-            .map { app -> prefs.customLabels[app.key]?.let { AppInfo(app.info, it) } ?: app }
+            .map { app -> prefs.customLabels[app.key]?.let(app::withLabel) ?: app }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** App Library groups, rebuilt when apps, settings or usage change. */
@@ -172,8 +176,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             layoutRepository.load()?.let { saved ->
                 // Widget ids left over from an add that never finished (e.g. the app was killed).
-                val used = saved.allPageWidgets().filterIsInstance<AppWidgetItem>().map { it.appWidgetId }.toSet()
-                appWidgets.orphanIds(used).forEach(appWidgets::deleteId)
+                // Collected through stacks too: missing a nested widget here would delete it on every start.
+                appWidgets.orphanIds(saved.usedAppWidgetIds()).forEach(appWidgets::deleteId)
             }
             // Keep the layout in sync with installed apps, hidden apps and the grid size.
             combine(repository.apps, settings.state) { apps, prefs -> apps to prefs }.collect { (apps, prefs) ->
@@ -304,6 +308,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         widgetGallery.value = false
     }
 
+    /** Adds a Smart Stack of the built-in widgets of [size] (see [smartStack]). */
+    fun addSmartStack(size: WidgetSize, target: WidgetTarget) {
+        closeWidgetGallery()
+        val current = layout.value ?: return
+        update(current.addWidget(smartStack("stack-${System.currentTimeMillis()}", size), target, pageCapacity, dockCapacity))
+        refreshWidgets()
+    }
+
     /** Adds a widget at the top of a home page or at the end of the Today page. */
     fun addWidget(kind: WidgetKind, size: WidgetSize, target: WidgetTarget) {
         closeWidgetGallery()
@@ -321,16 +333,24 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         update(current.addWidget(widget, target, pageCapacity, dockCapacity))
     }
 
-    /** New size in cells; built-in widgets only take their own sizes. */
+    /** New size in cells; built-in widgets only take their own sizes, a stack only one all its widgets take. */
     fun resizeWidget(id: String, span: Span) {
         closeMenu()
         val current = layout.value ?: return
         val resized = when (val widget = current.findWidget(id)) {
             is WidgetItem -> widget.kind.sizes.firstOrNull { it.span == span }?.let { widget.copy(size = it) }
             is AppWidgetItem -> widget.copy(span = span)
+            is WidgetStack -> WidgetSize.entries.firstOrNull { it.span == span }?.let { widget.resizedTo(it, ::supportsSize) }
             null -> null
         } ?: return
         update(current.updateWidget(resized, pageCapacity, dockCapacity))
+    }
+
+    /** Whether [widget] can take [size] (a built-in size, or one the hosted widget allows). */
+    fun supportsSize(widget: PageWidget, size: WidgetSize): Boolean = when (widget) {
+        is WidgetItem -> size in widget.kind.sizes
+        is AppWidgetItem -> appWidgets.info(widget.appWidgetId)?.let(appWidgets::spans)?.contains(size.span) == true
+        is WidgetStack -> widget.items.all { supportsSize(it, size) }
     }
 
     fun removeWidget(id: String) {
@@ -338,12 +358,20 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val current = layout.value ?: return
         val widget = current.findWidget(id)
         update(current.removeWidget(id, pageCapacity, dockCapacity))
+        widget?.let(::releaseWidget)
+    }
+
+    /** Frees what a removed widget held: its photo file or hosted widget id; a stack frees all of its widgets. */
+    private fun releaseWidget(widget: PageWidget) {
         when (widget) {
-            is WidgetItem -> WidgetPhotos.delete(getApplication(), id)
+            is WidgetItem -> WidgetPhotos.delete(getApplication(), widget.id)
             is AppWidgetItem -> appWidgets.deleteId(widget.appWidgetId)
-            null -> Unit
+            is WidgetStack -> widget.items.forEach(::releaseWidget)
         }
     }
+
+    /** Smart Stack actions; each is one layout change and one save. */
+    val stacks: StackActions = StackActions(layout, ::update, { pageCapacity }, { dockCapacity }, ::releaseWidget, ::closeMenu)
 
     /** Stores the picked image for a photo widget and shows it. */
     fun setWidgetPhoto(id: String, image: Uri) {

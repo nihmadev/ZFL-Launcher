@@ -67,8 +67,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     private val importer = LauncherImporter(app)
     private val layoutRepository = LayoutRepository.get(app)
 
-    /** Launchers whose layout can be imported. */
-    fun importSources(): List<ImportSource> = importer.findSources()
+    /** Launchers whose layout can be imported (a package query, so off the main thread). */
+    suspend fun importSources(): List<ImportSource> = withContext(Dispatchers.IO) { importer.findSources() }
 
     /**
      * Reads another launcher's layout for review. Fails with a [SecurityException] when
@@ -101,8 +101,14 @@ interface SettingsActions {
     val versionName: String
     /** Whether the wallpaper can be read (needed for the glass effect). */
     val hasWallpaperAccess: Boolean
+    /** Whether Android lets ZFL ask to become the home app. */
+    val isHomeRoleAvailable: Boolean
 
     fun requestDefaultHome()
     fun openLanguageSettings()
     fun requestWallpaperAccess()
+    /** Switches ZFL's UI language (`null` = follow the system); recreates the activity. */
+    fun setAppLanguage(tag: String?)
+    /** "Get Started": marks the onboarding as done and goes home. */
+    fun completeOnboarding()
 }
