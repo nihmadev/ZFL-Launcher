@@ -39,6 +39,13 @@ android {
     buildFeatures {
         compose = true
     }
+    // The in-app language picker switches languages at runtime, so an app bundle must keep
+    // every translation in the base APK instead of per-language splits.
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 kotlin {
@@ -67,5 +74,5 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     // Android's org.json is a stub in JVM tests; the real one tests layout/weather JSON parsing.
-    testImplementation("org.json:json:20250517")
+    testImplementation("org.json:json:20260814")
 }
