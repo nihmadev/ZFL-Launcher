@@ -7,6 +7,8 @@ the showcase; screenshots contain no Russian apps.
 
 The PNGs are direct, full-resolution device captures. The wallpaper, icons,
 glass surfaces, widgets, menus, and animations were rendered by the installed app.
+The original launcher layout, preferences, weather city, system language,
+app availability, and display settings were restored after capture.
 
 ## Page transitions
 
