@@ -64,11 +64,12 @@ class LauncherImporter(private val context: Context) {
     }
 
     /**
-     * Reads [source]'s layout and maps it onto [apps] (the installed, visible apps).
+     * Reads [source]'s layout and maps it onto [apps] (the installed, visible apps), in
+     * reading order on [grid].
      *
      * @throws SecurityException if the launcher protects its layout database.
      */
-    fun read(source: ImportSource, apps: List<AppInfo>, pageCapacity: Int, dockCapacity: Int): ImportPreview {
+    fun read(source: ImportSource, apps: List<AppInfo>, grid: GridSpec, dockCapacity: Int): ImportPreview {
         val rows = queryFavorites(source.authority)
         val screenOrder = queryScreenOrder(source.authority)
 
@@ -114,8 +115,9 @@ class LauncherImporter(private val context: Context) {
             .sortedWith(compareBy({ it.screen }, { it.cellX }))
             .mapNotNull(::item)
 
-        // Dock items that don't fit go to the last page instead of being dropped.
-        val layout = LayoutData(pages = pages.ifEmpty { listOf(emptyList()) }, dock = dock).normalized(pageCapacity, dockCapacity)
+        // Placed on the current grid, so importing never changes the grid. Dock items that
+        // don't fit go to the last page instead of being dropped.
+        val layout = LayoutData(pages = pages.ifEmpty { listOf(emptyList()) }, dock = dock, grid = grid).normalized(dockCapacity)
         val placed = layout.allAppKeys()
         return ImportPreview(
             source = source,

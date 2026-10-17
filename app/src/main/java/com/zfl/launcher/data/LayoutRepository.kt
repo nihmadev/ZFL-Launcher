@@ -1,6 +1,7 @@
 package com.zfl.launcher.data
 
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,10 +39,27 @@ class LayoutRepository private constructor(context: Context) {
 
     fun update(next: LayoutData) {
         _layout.value = next
-        scope.launch { store.save(next) }
+        scope.launch {
+            runCatching { store.save(next) }.onFailure { Log.w(TAG, "Couldn't save the layout", it) }
+        }
+    }
+
+    /**
+     * Moves the layout to [grid] ([withGrid]): one transformation and one save, grid and cells
+     * in the same file. Nothing changes when an item doesn't fit ([GridChange.Blocked]).
+     *
+     * @param initial layout to start from when none was saved yet (a fresh install).
+     */
+    suspend fun changeGrid(grid: GridSpec, initial: () -> LayoutData): GridChange {
+        val current = load() ?: initial()
+        val change = current.withGrid(grid)
+        if (change is GridChange.Applied && change.layout != _layout.value) update(change.layout)
+        return change
     }
 
     companion object {
+        private const val TAG = "LayoutRepository"
+
         @Volatile
         private var instance: LayoutRepository? = null
 

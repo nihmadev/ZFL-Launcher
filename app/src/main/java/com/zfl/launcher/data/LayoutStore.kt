@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.zfl.launcher.R
+import com.zfl.launcher.settings.LauncherSettings
 import java.io.File
 
 /**
@@ -14,27 +15,29 @@ import java.io.File
  * A small JSON file is plenty for a few hundred items and keeps the project dependency-free.
  */
 class LayoutStore(private val context: Context) {
-    private val file = File(context.filesDir, FILE_NAME)
+    private val file = LayoutFile(File(context.filesDir, FILE_NAME))
 
     /** The saved layout, or null on first launch. */
-    fun load(): LayoutData? = file.takeIf { it.exists() }?.readText()?.let(LayoutData::fromJson)
+    fun load(): LayoutData? = file.read(legacyGrid())
 
-    fun save(layout: LayoutData) {
-        // Write to a temp file first so a crash mid-write can't corrupt the layout.
-        val tmp = File(file.parentFile, "${file.name}.tmp")
-        tmp.writeText(layout.toJson())
-        tmp.renameTo(file)
-    }
+    fun save(layout: LayoutData): Unit = file.write(layout)
+
+    /**
+     * Grid of layouts saved before the grid was part of the layout file: four columns and the
+     * rows chosen in the settings of those versions. Also the grid of a fresh install.
+     */
+    fun legacyGrid(): GridSpec =
+        LauncherSettings.legacyGridRows(context)?.let { GridSpec.home(GridSpec.LEGACY_COLUMNS, it) } ?: GridSpec.Default
 
     /**
      * First-launch layout: an iOS-like dock (phone, messages, browser, camera) and every
      * other app in alphabetical order. Respects a dock saved by older versions.
      */
-    fun initialLayout(apps: List<AppInfo>, pageCapacity: Int): LayoutData {
+    fun initialLayout(apps: List<AppInfo>): LayoutData {
         val dockKeys = legacyDockKeys() ?: defaultDock(apps)
         val dock = dockKeys.filter { key -> apps.any { it.key == key } }.take(DEFAULT_DOCK_CAPACITY)
         val pages = apps.filter { it.key !in dock }.map { AppItem(it.key) }
-        return LayoutData(pages = listOf(pages), dock = dock.map(::AppItem)).normalized(pageCapacity)
+        return LayoutData(pages = listOf(pages), dock = dock.map(::AppItem), grid = legacyGrid()).normalized()
     }
 
     /** Dock saved by v0.1 in SharedPreferences, migrated once into the layout file. */
