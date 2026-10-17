@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.sp
 import com.zfl.launcher.R
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.data.LibraryCategory
+import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
@@ -111,7 +112,7 @@ private fun LibrarySearchPill(onClick: () -> Unit) {
         Modifier
             .fillMaxWidth()
             .height(46.dp)
-            .glass(CircleShape)
+            .glass(CircleShape, profile = GlassProfile.Button)
             .clickable(interactionSource = null, indication = null, onClick = onClick),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,

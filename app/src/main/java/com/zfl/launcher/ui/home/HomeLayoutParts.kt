@@ -55,6 +55,7 @@ import com.zfl.launcher.data.packCells
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.span
 import com.zfl.launcher.settings.LocalSettingsState
+import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
@@ -319,7 +320,7 @@ fun FolderIcon(
         modifier
             .size(size)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            .glass(shape, tint = Color.White.copy(alpha = if (highlighted) 0.32f else 0.2f)),
+            .glass(shape, tint = Color.White.copy(alpha = if (highlighted) 0.32f else 0.2f), profile = GlassProfile.Tile),
     ) {
         folder.apps.take(9).forEachIndexed { index, app ->
             AppIconImage(
@@ -345,7 +346,7 @@ fun MergeHalo(visible: Boolean, modifier: Modifier = Modifier) {
         modifier
             .size(settings.iconSize)
             .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
-            .glass(IconShape(settings.iconCorner), tint = Color.White.copy(alpha = 0.3f)),
+            .glass(IconShape(settings.iconCorner), tint = Color.White.copy(alpha = 0.3f), profile = GlassProfile.Tile),
     )
 }
 

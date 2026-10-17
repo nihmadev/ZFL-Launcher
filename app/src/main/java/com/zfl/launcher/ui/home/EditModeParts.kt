@@ -43,6 +43,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.zfl.launcher.R
 import com.zfl.launcher.data.AppInfo
+import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
@@ -94,7 +95,7 @@ private fun GlassPill(text: String, onClick: () -> Unit) {
         Modifier
             .height(38.dp)
             .width(96.dp)
-            .glass(CircleShape)
+            .glass(CircleShape, profile = GlassProfile.SmallButton)
             .clickable(interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {

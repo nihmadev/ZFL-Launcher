@@ -54,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.data.PageWidgetEntry
 import com.zfl.launcher.data.WidgetEntry
@@ -106,7 +107,7 @@ internal fun StackEditor(stack: WidgetStackEntry?, actions: StackEditorActions) 
                 Modifier
                     .fillMaxWidth()
                     .heightIn(max = 640.dp)
-                    .glass(SheetShape, tint = Color.Black.copy(alpha = 0.35f))
+                    .glass(SheetShape, tint = Tokens.SheetTint)
                     .pointerInput(Unit) { detectTapGestures { } }
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(bottom = 12.dp),
@@ -115,7 +116,7 @@ internal fun StackEditor(stack: WidgetStackEntry?, actions: StackEditorActions) 
                     Text(stringResource(R.string.stack_edit), color = Tokens.TextPrimary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     Text(
                         stringResource(R.string.action_done),
-                        color = Tokens.Accent,
+                        color = LocalAccent.current.primary,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.clickable(onClick = actions::close).padding(8.dp),

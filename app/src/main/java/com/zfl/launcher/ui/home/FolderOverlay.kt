@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.OpenFolder
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.FolderEntry
@@ -195,7 +196,7 @@ private fun FolderTitle(
         onValueChange = onNameChange,
         singleLine = true,
         textStyle = style,
-        cursorBrush = SolidColor(Tokens.Accent),
+        cursorBrush = SolidColor(LocalAccent.current.primary),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onDone() }),
         modifier = modifier

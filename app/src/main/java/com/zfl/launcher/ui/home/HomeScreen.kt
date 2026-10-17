@@ -191,7 +191,9 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     )
     val homeLayer = rememberGraphicsLayer()
     // Edit mode hides the status bar and shows the Edit/Done bar: the grid moves down a bit.
-    val editInset by animateDpAsState(if (editMode) 44.dp else 0.dp, Motion.settle(), label = "editInset")
+    val editInsetSpring by animateDpAsState(if (editMode) 44.dp else 0.dp, Motion.settle(), label = "editInset")
+    // The spring undershoots below zero on the way back, and padding must be non-negative.
+    val editInset = editInsetSpring.coerceAtLeast(0.dp)
     val liftedId = menu?.entry?.id
 
     CompositionLocalProvider(LocalWidgetEnvironment provides widgetEnvironment) {

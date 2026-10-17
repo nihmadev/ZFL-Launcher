@@ -64,9 +64,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.SearchMode
 import com.zfl.launcher.data.AppInfo
+import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
@@ -276,7 +278,7 @@ private fun LibrarySearch(query: String, onQueryChange: (String) -> Unit, result
                 sections.keys.forEach { letter ->
                     Text(
                         letter,
-                        color = Tokens.Accent,
+                        color = LocalAccent.current.primary,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
@@ -313,7 +315,7 @@ private fun SearchField(
         modifier
             .fillMaxWidth()
             .height(50.dp)
-            .glass(CircleShape)
+            .glass(CircleShape, profile = GlassProfile.Button)
             .consumeTaps()
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -327,7 +329,7 @@ private fun SearchField(
                 onValueChange = onQueryChange,
                 singleLine = true,
                 textStyle = TextStyle(color = Tokens.TextPrimary, fontSize = 17.sp),
-                cursorBrush = SolidColor(Tokens.Accent),
+                cursorBrush = SolidColor(LocalAccent.current.primary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { onSubmit() }),
                 modifier = Modifier

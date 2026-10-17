@@ -68,6 +68,7 @@ import com.zfl.launcher.data.PlaceholderEntry
 import com.zfl.launcher.data.itemAtCell
 import com.zfl.launcher.data.packCells
 import com.zfl.launcher.data.span
+import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
@@ -286,7 +287,7 @@ internal fun PagePill(
         transitionSpec = { fadeIn(Motion.fade()) togetherWith fadeOut(Motion.fade()) },
         modifier = modifier
             .height(Tokens.PillHeight)
-            .glass(ContinuousRoundedShape(Tokens.PillHeight / 2))
+            .glass(ContinuousRoundedShape(Tokens.PillHeight / 2), profile = GlassProfile.Button)
             .clickable(interactionSource = null, indication = null, enabled = !showDots, onClick = onSearch),
         label = "pill",
     ) { dots ->
