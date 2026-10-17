@@ -41,7 +41,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.launcherHaptics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -378,7 +378,7 @@ fun CheckRow(title: String, selected: Boolean, onClick: () -> Unit) {
 /** Wraps a switch callback so every toggle by the user is felt, on or off. */
 @Composable
 internal fun withToggleHaptic(onCheckedChange: (Boolean) -> Unit): (Boolean) -> Unit {
-    val haptic = LocalHapticFeedback.current
+    val haptic = launcherHaptics()
     val current by rememberUpdatedState(onCheckedChange)
     return remember(haptic) {
         { value -> haptic.performHapticFeedback(if (value) Haptics.ToggleOn else Haptics.ToggleOff); current(value) }

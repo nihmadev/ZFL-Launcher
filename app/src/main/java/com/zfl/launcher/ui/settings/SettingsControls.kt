@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
@@ -40,7 +41,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.launcherHaptics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -65,6 +66,7 @@ private object ControlStyle {
     val SliderKnobHeight = 26.dp
     const val SLIDER_PRESSED_SCALE = 1.15f
     val SegmentHeight = 36.dp
+    val PrimaryButtonHeight = 52.dp
     val SegmentTrack = Color.White.copy(alpha = 0.10f)
     val SegmentSelected = Color.White.copy(alpha = 0.22f)
     val ButtonSize = 44.dp
@@ -216,7 +218,7 @@ fun SliderRow(
 /** iOS segmented control with a sliding capsule highlight. */
 @Composable
 fun SegmentedControl(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = launcherHaptics()
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -275,5 +277,21 @@ fun GlassCircleButton(icon: ImageVector, contentDescription: String?, onClick: (
             tint = if (pressed) SettingsStyle.SecondaryText else Color.White,
             modifier = Modifier.size(26.dp),
         )
+    }
+}
+
+/** Full-width accent capsule for the main action of a page (Import, Apply); dimmed when not [enabled]. */
+@Composable
+fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(ControlStyle.PrimaryButtonHeight)
+            .clip(CircleShape)
+            .background(LocalAccent.current.primary.copy(alpha = if (enabled) 1f else 0.4f))
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = Color.White.copy(alpha = if (enabled) 1f else 0.6f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
     }
 }

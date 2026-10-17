@@ -1,28 +1,19 @@
 package com.zfl.launcher.ui.settings
 
 import android.widget.Toast
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.zfl.launcher.ui.theme.LocalAccent
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zfl.launcher.R
 import com.zfl.launcher.data.ImportSource
 
@@ -35,6 +26,7 @@ fun ImportScreen(vm: SettingsViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val sources by produceState<List<ImportSource>?>(null) { value = vm.importSources() }
     val state = rememberImportState(vm)
+    val settings by vm.settings.state.collectAsStateWithLifecycle()
 
     SettingsPage(title = stringResource(R.string.import_title), onBack = onBack) {
         item {
@@ -57,19 +49,17 @@ fun ImportScreen(vm: SettingsViewModel, onBack: () -> Unit) {
             item { SectionHeader(stringResource(R.string.import_summary)) }
             item { ImportSummary(preview, state) }
             item { SectionFooter(stringResource(R.string.import_widgets_note)) }
+            // Importing replaces the arrangement, so a locked layout has to be unlocked here first.
+            if (settings.layoutLocked) {
+                item { SectionFooter(stringResource(R.string.import_locked)) }
+                item {
+                    Spacer(Modifier.height(12.dp))
+                    SettingsCard { SwitchRow(stringResource(R.string.layout_lock), true, vm.settings::setLayoutLocked) }
+                }
+            }
             item {
                 Spacer(Modifier.height(20.dp))
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .clip(CircleShape)
-                        .background(LocalAccent.current.primary)
-                        .clickable { state.confirming = true },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(stringResource(R.string.import_action), color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                }
+                PrimaryButton(stringResource(R.string.import_action), onClick = { state.confirming = true }, enabled = !settings.layoutLocked)
             }
         }
     }

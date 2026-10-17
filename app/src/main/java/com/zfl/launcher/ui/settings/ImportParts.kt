@@ -74,10 +74,10 @@ class ImportState internal constructor(private val vm: SettingsViewModel, privat
         }
     }
 
-    /** Replaces the Home Screen: one layout change, saved once. */
-    internal fun apply() {
+    /** Replaces the Home Screen: one layout change, saved once. False while the layout is locked. */
+    internal fun apply(): Boolean {
         confirming = false
-        preview?.let { vm.applyImport(it, removeOthers) }
+        return preview?.let { vm.applyImport(it, removeOthers) } == true
     }
 }
 
@@ -135,10 +135,7 @@ fun ImportConfirmation(state: ImportState, onApplied: () -> Unit) {
     if (state.confirming && preview != null) {
         ConfirmImportDialog(
             launcherName = preview.source.label,
-            onConfirm = {
-                state.apply()
-                onApplied()
-            },
+            onConfirm = { if (state.apply()) onApplied() },
             onDismiss = { state.confirming = false },
         )
     }
