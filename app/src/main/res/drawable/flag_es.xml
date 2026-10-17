@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Square flag artwork clipped by the shared circular language badge. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp"
+    android:height="60dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <path android:fillColor="#AA151B" android:pathData="M0,0H60V15H0Z" />
+    <path android:fillColor="#F1BF00" android:pathData="M0,15H60V45H0Z" />
+    <path android:fillColor="#AA151B" android:pathData="M0,45H60V60H0Z" />
+    <path android:fillColor="#AA151B" android:pathData="M18,24H28V34Q23,40 18,34Z M18,21L19,18L21,20L23,17L25,20L27,18L28,21Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M20,26H23V30H20Z M23,30H26V34H23Z M14,26H16V35H14Z M30,26H32V35H30Z" />
+    <path android:fillColor="#F1BF00" android:pathData="M23,26H26V30H23Z M20,30H23V34H20Z" />
+    <path android:fillColor="#AA151B" android:pathData="M13,25H17V27H13Z M29,25H33V27H29Z M13,34H17V36H13Z M29,34H33V36H29Z" />
+</vector>

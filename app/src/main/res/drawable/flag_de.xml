@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Square artwork clipped by the shared circular language badge. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp" android:height="60dp"
+    android:viewportWidth="60" android:viewportHeight="60">
+    <path android:fillColor="#000000" android:pathData="M0,0H60V20H0Z" />
+    <path android:fillColor="#DD0000" android:pathData="M0,20H60V40H0Z" />
+    <path android:fillColor="#FFCE00" android:pathData="M0,40H60V60H0Z" />
+</vector>

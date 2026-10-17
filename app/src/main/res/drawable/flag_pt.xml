@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simplified heraldry remains legible in the shared 30dp circular badge. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp" android:height="60dp"
+    android:viewportWidth="60" android:viewportHeight="60">
+    <path android:fillColor="#006600" android:pathData="M0,0H24V60H0Z" />
+    <path android:fillColor="#FF0000" android:pathData="M24,0H60V60H24Z" />
+    <path android:fillColor="#00000000" android:strokeColor="#FFFF00" android:strokeWidth="1.6"
+        android:pathData="M35,30A11,11 0,1 1,13 30A11,11 0,1 1,35 30M13,30H35M24,19V41M15,24L33,36M15,36L33,24" />
+    <path android:fillColor="#FFFFFF" android:strokeColor="#FF0000" android:strokeWidth="2.5"
+        android:pathData="M17,22H31V31Q31,37 24,39Q17,37 17,31Z" />
+    <path android:fillColor="#003399" android:pathData="M22.5,25H25.5V28H22.5Z M19,29H22V32H19Z M26,29H29V32H26Z M22.5,29H25.5V32H22.5Z M22.5,33H25.5V36H22.5Z" />
+</vector>

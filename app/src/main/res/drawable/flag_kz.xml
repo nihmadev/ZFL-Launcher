@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sun, steppe eagle and hoist ornament, simplified for the circular language badge. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp" android:height="60dp"
+    android:viewportWidth="60" android:viewportHeight="60">
+    <path android:fillColor="#00AFCA" android:pathData="M0,0H60V60H0Z" />
+    <path android:fillColor="#FFEC2D" android:pathData="M40,25A8,8 0,1 1,24 25A8,8 0,1 1,40 25" />
+    <path android:fillColor="#FFEC2D" android:pathData="M31,15L32,11L33,15Z M35,15.5L37,12L37,16.5Z M39,18L42,15L41,20Z M41.5,22L45,21L42,24Z M42,26L46,27L41,28Z M40,30L43,33L38,32Z M36,33L38,37L34,34Z M31,35L32,39L33,35Z M28,34L26,37L26,33Z M25,32L21,33L23,30Z M22,28L18,27L22,26Z M22,24L19,21L22.5,22Z M23,20L22,15L25,18Z M27,16.5L27,12L29,15.5Z" />
+    <path android:fillColor="#FFEC2D" android:pathData="M15,34Q22,39 29,39L32,37L35,39Q42,39 49,34L46,40L43,39L43,43L40,41L39,45L36,43L34,47L32,45L30,47L28,43L25,45L24,41L21,43L21,39L18,40Z" />
+    <path android:fillColor="#FFEC2D" android:pathData="M9,8H11V52H9Z M7,10L13,14L7,18L13,22L7,26L13,30L7,34L13,38L7,42L13,46L7,50V47L10,46L5,42L10,38L5,34L10,30L5,26L10,22L5,18L10,14L7,13Z" />
+</vector>

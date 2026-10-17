@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Serbian tricolour with a small crowned double-headed eagle shield for the round badge. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp" android:height="60dp"
+    android:viewportWidth="60" android:viewportHeight="60">
+    <path android:fillColor="#C6363C" android:pathData="M0,0H60V20H0Z" />
+    <path android:fillColor="#0C4076" android:pathData="M0,20H60V40H0Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M0,40H60V60H0Z" />
+    <path android:fillColor="#EDB92E" android:pathData="M15,17L13,10L17,12L20,8L23,12L27,10L25,17Z M19,5H21V9H19Z M17,6H23V7H17Z" />
+    <path android:fillColor="#C6363C" android:strokeColor="#EDB92E" android:strokeWidth="0.8"
+        android:pathData="M11,18H29V34Q29,41 20,45Q11,41 11,34Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M19,26L16,23L14,24L14,21L18,21L20,24L22,21L26,21L26,24L24,23L21,26L23,28L27,25L27,35L24,33L25,38L22,36L23,40L20,38L17,40L18,36L15,38L16,33L13,35L13,25L17,28Z" />
+    <path android:fillColor="#C6363C" android:pathData="M17,28H23V33Q23,35 20,36Q17,35 17,33Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M19.5,28H20.5V35H19.5Z M17,30.5H23V31.5H17Z" />
+</vector>
