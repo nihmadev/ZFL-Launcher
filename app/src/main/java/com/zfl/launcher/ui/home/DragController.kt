@@ -14,20 +14,22 @@ import com.zfl.launcher.data.AppEntry
 import com.zfl.launcher.data.DEFAULT_DOCK_CAPACITY
 import com.zfl.launcher.data.DropPosition
 import com.zfl.launcher.data.FolderEntry
+import com.zfl.launcher.data.GridSpec
 import com.zfl.launcher.data.HomeEntry
 import com.zfl.launcher.data.HomeState
 import com.zfl.launcher.data.PlaceholderEntry
 import com.zfl.launcher.data.boundedCell
-import com.zfl.launcher.data.cascadePages
 import com.zfl.launcher.data.itemAtCell
 import com.zfl.launcher.data.packCells
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.span
-import com.zfl.launcher.ui.theme.Tokens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+/** Apps on one page of an open folder. */
+internal val FOLDER_PAGE_SIZE: Int = GridSpec.Folder.cellCount
 
 /** Where a dragged item was picked up. */
 enum class DragSource { Page, Dock, Folder }
@@ -91,6 +93,8 @@ class DragController(
     /** Home page under the finger; -1 for the Today page. */
     var currentPage: Int = 0
     var screenWidth: Float = 0f
+    /** Right-to-left layout: columns, dock slots and page flips are mirrored on screen. */
+    var rtl: Boolean = false
     var openFolder: FolderEntry? = null
     var pageGrid: GridGeometry? = null
     var dockBounds: Rect? = null
@@ -112,6 +116,10 @@ class DragController(
 
     val isDragging: Boolean get() = session?.active == true
     val draggedId: String? get() = session?.takeIf { it.active }?.entry?.id
+
+    /** Where the item lands if released now (no marker while it would make a folder). */
+    internal val markerTarget: DropPosition?
+        get() = if (session?.active != true || mergeCandidate != null) null else pendingTarget ?: target
 
     /** Long-press in normal mode: remember the item; dragging begins only if the finger moves. */
     fun prepare(entry: HomeEntry, source: DragSource, iconBounds: Rect, pointer: Offset) {
@@ -145,79 +153,6 @@ class DragController(
     /** One-shot: where the item was released, so its new slot can animate from there. */
     fun takeDropOrigin(id: String): Offset? =
         dropOrigin?.takeIf { it.first == id }?.second?.also { dropOrigin = null }
-
-    // region Preview lists
-
-    fun previewPages(position: DropPosition? = target): List<List<HomeEntry>> {
-        val dragged = session?.takeIf { it.active }?.entry ?: return state.pages
-        val pages = state.pages.map { page -> page.filter { it.id != dragged.id } }.toMutableList()
-        // An extra empty page at the end lets the user drop on a new page.
-        if (pages.last().isNotEmpty()) pages += emptyList<HomeEntry>()
-        (position as? DropPosition.PageCell)?.let { t ->
-            if (t.page in pages.indices) {
-                // The gap is as big as what is dragged: a widget opens a widget-sized hole.
-                pages[t.page] = pages[t.page].toMutableList().apply { add(0, PlaceholderEntry(dragged.span)) }
-            }
-        }
-        val cells = previewCells(position)
-        return cascadePages(pages, Tokens.GridColumns * state.rows, dropEmpty = false, cell = { cells[it.id] }) { it.span }
-    }
-
-    /** The marker and preview use the same reservations as the persisted move. */
-    fun previewCells(position: DropPosition? = target): Map<String, Int> {
-        val dragged = session?.takeIf { it.active }?.entry ?: return state.cells
-        val rest = state.cells - dragged.id
-        val t = position as? DropPosition.PageCell ?: return rest
-        return rest + ("placeholder" to boundedCell(t.cell, dragged.span, state.rows))
-    }
-
-    fun previewDock(position: DropPosition? = target): List<HomeEntry> {
-        val dragged = draggedId ?: return state.dock
-        val dock = state.dock.filter { it.id != dragged }.toMutableList()
-        (position as? DropPosition.Dock)?.let { dock.add(it.index.coerceIn(0, dock.size), PlaceholderEntry()) }
-        return dock
-    }
-
-    fun previewFolder(folder: FolderEntry, position: DropPosition? = target): List<HomeEntry> {
-        val apps: MutableList<HomeEntry> = folder.apps.map(::AppEntry).filter { it.id != draggedId }.toMutableList()
-        (position as? DropPosition.InFolder)?.takeIf { it.folderId == folder.id }?.let {
-            apps.add(it.index.coerceIn(0, apps.size), PlaceholderEntry())
-        }
-        return apps
-    }
-
-    // region Drop marker
-
-    /** Where the item lands if released now (no marker while it would make a folder). */
-    private val markerTarget: DropPosition?
-        get() = if (session?.active != true || mergeCandidate != null) null else pendingTarget ?: target
-
-    /** Cell and footprint of the drop marker on home [page], or null if it is elsewhere. */
-    fun pageMarker(page: Int): Pair<Int, Span>? {
-        val t = markerTarget as? DropPosition.PageCell ?: return null
-        if (t.page != page) return null
-        val items = previewPages(t).getOrNull(page) ?: return null
-        val index = items.indexOfFirst { it is PlaceholderEntry }.takeIf { it >= 0 } ?: return null
-        val spans = items.map { it.span }
-        val positions = previewCells(t)
-        val cell = packCells(spans, Tokens.GridColumns, state.rows, items.map { positions[it.id] })[index] ?: return null
-        return cell to spans[index]
-    }
-
-    /** Dock slot of the drop marker and the number of slots it is spread over. */
-    fun dockMarker(): Pair<Int, Int>? {
-        val t = markerTarget as? DropPosition.Dock ?: return null
-        val items = previewDock(t)
-        return items.indexOfFirst { it is PlaceholderEntry }.takeIf { it >= 0 }?.let { it to items.size }
-    }
-
-    /** Index of the drop marker among [folder]'s apps. */
-    fun folderMarker(folder: FolderEntry): Int? {
-        val t = markerTarget as? DropPosition.InFolder ?: return null
-        return previewFolder(folder, t).indexOfFirst { it is PlaceholderEntry }.takeIf { it >= 0 }
-    }
-
-    // endregion
 
     private fun initialTarget(entry: HomeEntry, source: DragSource): DropPosition? = when (source) {
         DragSource.Folder -> openFolder?.let { folder ->
@@ -281,13 +216,12 @@ class DragController(
         val visible = pages[page]
         val spans = visible.map { it.span }
         val positions = previewCells()
-        val cells = packCells(spans, grid.columns, grid.rows, visible.map { positions[it.id] })
+        val cells = packCells(spans, grid.grid, visible.map { positions[it.id] })
         val cell = grid.cellAt(p)
-        val anchor = if (s.entry is PageWidgetEntry) {
-            grid.cellAt(s.pointer - s.touchOffset + Offset(grid.cellWidth / 2, grid.cellHeight / 2))
-        } else cell
-        val destination = DropPosition.PageCell(page, boundedCell(anchor, s.entry.span, grid.rows, grid.columns))
-        val underIndex = itemAtCell(spans, cells, cell, grid.columns)
+        // A widget lands where its card is, whichever cell the finger is on.
+        val anchor = if (s.entry is PageWidgetEntry) grid.footprintCell(s.pointer - s.touchOffset, s.entry.span) else cell
+        val destination = DropPosition.PageCell(page, boundedCell(anchor, s.entry.span, grid.grid))
+        val underIndex = itemAtCell(spans, cells, cell, grid.grid)
         val under = underIndex?.let(visible::get)
         when {
             under == null -> {
@@ -313,15 +247,18 @@ class DragController(
         val others = state.dock.filter { it.id != s.entry.id }
         val canInsert = s.source == DragSource.Dock || others.size < dockCapacity
         val slots = if (canInsert) others.size + 1 else others.size
+        // Distance from the dock's start edge: slot 0 is on the right in RTL.
+        val x = if (rtl) dock.right - p.x else p.x - dock.left
         val slotWidth = dock.width / slots.coerceAtLeast(1)
-        val slot = ((p.x - dock.left) / slotWidth).toInt().coerceIn(0, (slots - 1).coerceAtLeast(0))
+        val slot = (x / slotWidth).toInt().coerceIn(0, (slots - 1).coerceAtLeast(0))
 
         // Hovering the middle of a dock icon makes a folder there too.
         val preview = previewDock()
-        val under = preview.getOrNull(((p.x - dock.left) / (dock.width / preview.size.coerceAtLeast(1))).toInt())
-        val underCenterX = preview.indexOf(under).let { dock.left + (it + 0.5f) * dock.width / preview.size.coerceAtLeast(1) }
+        val previewWidth = dock.width / preview.size.coerceAtLeast(1)
+        val under = preview.getOrNull((x / previewWidth).toInt())
+        val underCenterX = (preview.indexOf(under) + 0.5f) * previewWidth
         if (under != null && canMergeOnto(s.entry, under) &&
-            isOver(under, kotlin.math.abs(p.x - underCenterX), pageGrid?.iconSize ?: dock.height)
+            isOver(under, kotlin.math.abs(x - underCenterX), pageGrid?.iconSize ?: dock.height)
         ) {
             retarget(null)
             setMerge(under.id)
@@ -381,11 +318,13 @@ class DragController(
 
     /** Holding the item at the left/right screen edge flips to the neighbor page. */
     private fun handlePageEdge(p: Offset) {
-        val direction = when {
+        val side = when {
             p.x < edgePx -> -1
             p.x > screenWidth - edgePx -> 1
             else -> 0
         }
+        // The pager runs from right to left in RTL.
+        val direction = if (rtl) -side else side
         if (direction == 0) {
             cancelEdgeFlip()
             return
@@ -410,6 +349,12 @@ class DragController(
         edgeJob = null
     }
 
+    /** Ends the drag without dropping (the layout was locked): the item stays where it was, nothing is saved. */
+    fun cancel() {
+        dropOrigin = null
+        reset()
+    }
+
     private fun drop(s: DragSession) {
         val position = if (mergeArmed) mergeCandidate?.let { DropPosition.Merge(it) } else null
         // Land where the marker shows, even if the icons haven't made room yet.
@@ -431,7 +376,6 @@ class DragController(
     }
 
     companion object {
-        const val FOLDER_PAGE_SIZE = 9
         /** The dragged icon's center this close to an icon center (fraction of icon size) targets a folder. */
         private const val MERGE_ENTER_RADIUS = 0.55f
         /** A picked folder target is kept until the dragged icon moves this far away. */

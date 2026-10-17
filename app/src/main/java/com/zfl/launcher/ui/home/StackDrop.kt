@@ -44,10 +44,7 @@ internal fun mergesAtOnce(target: HomeEntry?): Boolean = target is FolderEntry |
 internal fun mergeDistance(session: DragSession, grid: GridGeometry, under: HomeEntry, cell: Int): Pair<Float, Float> =
     if (session.entry is PageWidgetEntry) {
         val span = (under as? PageWidgetEntry)?.span ?: Span.One
-        val center = Offset(
-            grid.origin.x + (cell % grid.columns + span.columns / 2f) * grid.cellWidth,
-            grid.origin.y + (cell / grid.columns + span.rows / 2f) * grid.cellHeight,
-        )
+        val center = grid.footprintCenter(cell, span)
         val card = session.pointer - session.touchOffset + Offset(session.itemSize.width / 2, session.itemSize.height / 2)
         (card - center).getDistance() to minOf(span.columns * grid.cellWidth, span.rows * grid.cellHeight)
     } else {
