@@ -141,28 +141,28 @@ fun LayoutData.findStack(id: String): WidgetStack? =
  * Replaces the stack [id] (on a page or Today) with [transform]'s result, normalized: a
  * stack left with one widget becomes it, in the stack's cell. Unchanged when it's missing.
  */
-fun LayoutData.updateStack(id: String, pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY, transform: (WidgetStack) -> WidgetStack): LayoutData {
+fun LayoutData.updateStack(id: String, dockCapacity: Int = DEFAULT_DOCK_CAPACITY, transform: (WidgetStack) -> WidgetStack): LayoutData {
     val stack = findStack(id) ?: return this
     val next = transform(stack).normalizedStack()
-    return replaceTopLevel(id, next).normalized(pageCapacity, dockCapacity)
+    return replaceTopLevel(id, next).normalized(dockCapacity)
 }
 
 /** Drops widget [dropped] (top level, on a page) onto widget or stack [targetId]: makes or grows a stack there. */
-internal fun LayoutData.dropOnWidget(dropped: PageWidget, targetId: String, newStackId: String, pageCapacity: Int, dockCapacity: Int): LayoutData {
+internal fun LayoutData.dropOnWidget(dropped: PageWidget, targetId: String, newStackId: String, dockCapacity: Int): LayoutData {
     if (dropped is WidgetStack || dropped.id == targetId) return this
     val target = pages.flatten().firstOrNull { it.id == targetId } as? PageWidget ?: return this
     val merged = when (target) {
         is WidgetStack -> target.plus(dropped)
         else -> stackOf(target, dropped, newStackId)
     } ?: return this
-    return without(dropped.id).replaceTopLevel(targetId, merged).normalized(pageCapacity, dockCapacity)
+    return without(dropped.id).replaceTopLevel(targetId, merged).normalized(dockCapacity)
 }
 
 /**
  * Takes widget [itemId] out of its stack onto the same page (or Today), right after the
  * stack; the page reflows to fit it.
  */
-fun LayoutData.takeOutOfStack(stackId: String, itemId: String, pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
+fun LayoutData.takeOutOfStack(stackId: String, itemId: String, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
     val stack = findStack(stackId) ?: return this
     val item = stack.items.firstOrNull { it.id == itemId } ?: return this
     val rest = stack.minus(itemId).normalizedStack()
@@ -172,7 +172,7 @@ fun LayoutData.takeOutOfStack(stackId: String, itemId: String, pageCapacity: Int
         pages = pages.map(::insert),
         today = today.flatMap { if (it.id == stackId) listOfNotNull(rest, item) else listOf(it) },
         cells = cells + inherited,
-    ).normalized(pageCapacity, dockCapacity)
+    ).normalized(dockCapacity)
 }
 
 /** Swaps the top-level item [id] for [next] (null removes it); a new id inherits the old cell. */

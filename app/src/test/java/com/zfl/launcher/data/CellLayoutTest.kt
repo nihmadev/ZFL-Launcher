@@ -8,13 +8,13 @@ import org.junit.Test
 class CellLayoutTest {
     private val google = AppWidgetItem("google", 31, "google/.Search", Span(4, 1))
     private val chat = AppItem("chatgpt")
-    private fun move(layout: LayoutData, item: HomeItem, page: Int, cell: Int, capacity: Int = 24): LayoutData =
-        layout.move(item, DropPosition.PageCell(page, cell), capacity) { "Folder" }
+    private fun move(layout: LayoutData, item: HomeItem, page: Int, cell: Int): LayoutData =
+        layout.move(item, DropPosition.PageCell(page, cell)) { "Folder" }
 
     @Test
     fun hostedWidgetMovesIntoEmptyBottomRowWithoutMovingOtherItems() {
         val layout = LayoutData(listOf(listOf(google, chat, AppItem("a"))), emptyList())
-        val before = layout.withPageCells(24)
+        val before = layout.withPageCells()
         val next = move(layout, google, 0, 20)
         assertEquals(20, next.cells[google.id])
         assertEquals(before.cells[chat.id], next.cells[chat.id])
@@ -27,8 +27,9 @@ class CellLayoutTest {
     fun appMovesToBottomRightOfSecondPageAndSurvivesReloadAndReconcile() {
         val layout = LayoutData(listOf(listOf(chat, google), listOf(AppItem("a"))), emptyList())
         val next = move(layout, chat, 1, 23)
-        val restored = LayoutData.fromJson(next.toJson())!!.reconcile(listOf(chat.appKey, "a"), 24)
-        assertEquals(next, restored)
+        val restored = layoutFromJson(next.toJson(), GridSpec.Default)!!.reconcile(listOf(chat.appKey, "a"))
+        // reconcile also records the installed apps it has seen (LayoutData.known).
+        assertEquals(next, restored.copy(known = null))
         assertTrue(restored.pages[1].contains(chat))
         assertEquals(23, restored.cells[chat.id])
         assertEquals(0, restored.cells["a"])
@@ -40,7 +41,7 @@ class CellLayoutTest {
         assertTrue(next.pages[0].isEmpty())
         assertEquals(listOf(chat), next.pages[1])
         assertEquals(21, next.cells[chat.id])
-        assertEquals(next, next.normalized(24))
+        assertEquals(next, next.normalized())
     }
 
     @Test
@@ -90,7 +91,7 @@ class CellLayoutTest {
     fun resizingGridReflowsOutOfBoundsItemsWithoutLossOrOverlap() {
         val apps = List(24) { AppItem("a$it") }
         val layout = move(LayoutData(listOf(apps), emptyList()), apps[0], 0, 23)
-        val next = layout.normalized(20)
+        val next = (layout.withGrid(GridSpec(4, 5)) as GridChange.Applied).layout
         assertEquals(layout.allAppKeys(), next.allAppKeys())
         next.pages.forEach { page ->
             val cells = page.map { next.cells.getValue(it.id) }
@@ -101,32 +102,32 @@ class CellLayoutTest {
 
     @Test
     fun savedPositionsReserveSpaceBeforeAutomaticPlacement() {
-        assertEquals(listOf(1, 0, 23), packCells(List(3) { Span.One }, 4, 6, listOf(null, 0, 23)))
-        assertEquals(listOf(0, 1), packCells(List(2) { Span.One }, 4, 6, listOf(0, 0)))
+        assertEquals(listOf(1, 0, 23), packCells(List(3) { Span.One }, GridSpec(4, 6), listOf(null, 0, 23)))
+        assertEquals(listOf(0, 1), packCells(List(2) { Span.One }, GridSpec(4, 6), listOf(0, 0)))
     }
 
     @Test
     fun oldLayoutsKeepOriginalPositionsUntilMoved() {
         val old = """{"version":1,"pages":[[{"app":"a"},{"app":"b"}]],"dock":[]}"""
-        val layout = LayoutData.fromJson(old)!!
+        val layout = layoutFromJson(old, GridSpec.Default)!!
         assertTrue(layout.cells.isEmpty())
-        assertEquals(mapOf("a" to 0, "b" to 1), layout.withPageCells(24).cells)
+        assertEquals(mapOf("a" to 0, "b" to 1), layout.withPageCells().cells)
     }
 
     @Test
     fun mergeInheritsTargetCellAndMovingToDockKeepsOtherGaps() {
         val layout = LayoutData(listOf(listOf(chat, AppItem("a"), AppItem("b"))), emptyList(),
             cells = mapOf(chat.id to 23, "a" to 10, "b" to 15))
-        val merged = layout.move(chat, DropPosition.Merge("a"), 24) { "AI" }
+        val merged = layout.move(chat, DropPosition.Merge("a")) { "AI" }
         assertEquals(10, merged.cells[merged.pages[0].filterIsInstance<FolderItem>().single().id])
-        val docked = layout.move(chat, DropPosition.Dock(0), 24) { "" }
+        val docked = layout.move(chat, DropPosition.Dock(0)) { "" }
         assertEquals(mapOf("a" to 10, "b" to 15), docked.cells)
         assertEquals(listOf(chat), docked.dock)
     }
     @Test
     fun addingAndResizingWidgetReservesItsFootprintBeforeExistingApps() {
         val layout = move(LayoutData(listOf(listOf(chat)), emptyList()), chat, 0, 0)
-        val added = layout.addWidget(google, WidgetTarget.Page(0), 24)
+        val added = layout.addWidget(google, WidgetTarget.Page(0))
         assertEquals(0, added.cells[google.id])
         assertEquals(4, added.cells[chat.id])
         val resized = added.updateWidget(google.copy(span = Span(4, 2)), 24)
@@ -139,7 +140,7 @@ class CellLayoutTest {
     fun uninstallingOneAppInFolderKeepsRemainingAppAtFolderCell() {
         val folder = FolderItem("folder", "AI", listOf(chat.appKey, "gone"))
         val layout = LayoutData(listOf(listOf(folder)), emptyList(), cells = mapOf(folder.id to 19))
-        val next = layout.reconcile(listOf(chat.appKey), 24)
+        val next = layout.reconcile(listOf(chat.appKey))
         assertEquals(listOf(listOf(chat)), next.pages)
         assertEquals(mapOf(chat.id to 19), next.cells)
     }

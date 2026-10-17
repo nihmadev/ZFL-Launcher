@@ -17,9 +17,9 @@ class WidgetStackTest {
 
     @Test
     fun droppingWidgetOnSameSizeWidgetMakesStackInTargetCell() {
-        val layout = page(clock, AppItem("a"), battery).withPageCells(24)
+        val layout = page(clock, AppItem("a"), battery).withPageCells()
         val batteryCell = layout.cells.getValue(battery.id)
-        val next = layout.move(clock, DropPosition.Merge(battery.id), 24) { "" }
+        val next = layout.move(clock, DropPosition.Merge(battery.id)) { "" }
         val made = next.pages.flatten().filterIsInstance<WidgetStack>().single()
         assertEquals(listOf(clock, battery), made.items)
         assertEquals(0, made.current) // the dropped widget is shown
@@ -30,7 +30,7 @@ class WidgetStackTest {
 
     @Test
     fun droppingOnStackAddsAndShowsTheWidget() {
-        val next = page(stack, weather).move(weather, DropPosition.Merge("s"), 24) { "" }
+        val next = page(stack, weather).move(weather, DropPosition.Merge("s")) { "" }
         val grown = next.findStack("s")!!
         assertEquals(listOf(clock, weather, hosted, battery), grown.items)
         assertEquals(weather, grown.currentItem)
@@ -39,7 +39,7 @@ class WidgetStackTest {
     @Test
     fun otherSizeAndFullStackAreRejected() {
         val layout = page(clock, mediumWeather)
-        assertEquals(layout.normalized(24), layout.move(mediumWeather, DropPosition.Merge(clock.id), 24) { "" }.normalized(24))
+        assertEquals(layout.normalized(), layout.move(mediumWeather, DropPosition.Merge(clock.id)) { "" }.normalized())
         assertNull(stackOf(clock, mediumWeather, "x"))
         assertNull(stack.plus(mediumWeather))
         val full = WidgetStack("f", WidgetSize.Small, List(STACK_MAX_ITEMS) { WidgetItem("w$it", WidgetKind.Clock, WidgetSize.Small) })
@@ -53,9 +53,9 @@ class WidgetStackTest {
     @Test
     fun removeKeepsShownWidgetAndSingleLeftoverBecomesWidgetInStackCell() {
         assertEquals(hosted, stack.minus(clock.id).currentItem)
-        val layout = page(AppItem("a"), WidgetStack("s", WidgetSize.Small, listOf(clock, battery))).withPageCells(24)
+        val layout = page(AppItem("a"), WidgetStack("s", WidgetSize.Small, listOf(clock, battery))).withPageCells()
         val cell = layout.cells.getValue("s")
-        val next = layout.removeWidget(clock.id, 24)
+        val next = layout.removeWidget(clock.id)
         assertEquals(battery, next.pages[0].last())
         assertEquals(cell, next.cells[battery.id])
         assertNull(next.findStack("s"))
@@ -81,12 +81,12 @@ class WidgetStackTest {
     @Test
     fun takingOutPutsWidgetNextToStack() {
         val layout = page(stack, AppItem("a"))
-        val next = layout.takeOutOfStack("s", clock.id, 24)
+        val next = layout.takeOutOfStack("s", clock.id)
         assertEquals(listOf("s", clock.id, "a"), next.pages[0].map { it.id })
         assertEquals(listOf(hosted, battery), next.findStack("s")!!.items)
         // Taking one out of a pair dissolves the stack into the other widget.
-        val pair = page(WidgetStack("p", WidgetSize.Small, listOf(clock, battery))).withPageCells(24)
-        val split = pair.takeOutOfStack("p", clock.id, 24)
+        val pair = page(WidgetStack("p", WidgetSize.Small, listOf(clock, battery))).withPageCells()
+        val split = pair.takeOutOfStack("p", clock.id)
         assertEquals(listOf(battery.id, clock.id), split.pages[0].map { it.id })
         assertEquals(pair.cells["p"], split.cells[battery.id])
     }
@@ -94,12 +94,12 @@ class WidgetStackTest {
     @Test
     fun jsonRoundTripKeepsStackAndSkipsUnknownNestedEntries() {
         val layout = LayoutData(listOf(listOf(stack, AppItem("a"))), emptyList(), today = listOf(stack.copy(id = "t", items = listOf(weather, clock))))
-        assertEquals(layout, LayoutData.fromJson(layout.toJson()))
+        assertEquals(layout, layoutFromJson(layout.toJson(), GridSpec.Default))
 
         val json = """{"version":2,"pages":[[{"stack":"s","widget":"s","kind":"stack","size":"Small","current":2,"items":[
             {"widget":"clock","kind":"Clock","size":"Small"},{"hologram":"h1"},{"widget":"x","kind":"FutureKind","size":"Small"},
             {"widget":"battery","kind":"Battery","size":"Small"}]},{"app":"a"},{"teleport":"t"}]],"dock":[{"app":"d"}]}"""
-        val parsed = LayoutData.fromJson(json)!!
+        val parsed = layoutFromJson(json, GridSpec.Default)!!
         assertEquals(WidgetStack("s", WidgetSize.Small, listOf(clock, battery), current = 1), parsed.pages[0][0])
         assertEquals(setOf("a", "d"), parsed.allAppKeys())
     }
@@ -114,7 +114,7 @@ class WidgetStackTest {
     @Test
     fun deadHostedWidgetLeavesOnlyItsStack() {
         val layout = page(stack, AppItem("a"))
-        val next = layout.withoutDeadAppWidgets(isAlive = { false }, pageCapacity = 24)
+        val next = layout.withoutDeadAppWidgets(isAlive = { false })
         assertEquals(listOf(clock, battery), next.findStack("s")!!.items)
         assertEquals(setOf("a"), next.allAppKeys())
     }
@@ -131,11 +131,11 @@ class WidgetStackTest {
     @Test
     fun updateWidgetReplacesWidgetInsideStack() {
         val layout = page(stack)
-        val next = layout.updateWidget(clock.copy(photo = 5L), 24)
+        val next = layout.updateWidget(clock.copy(photo = 5L))
         assertEquals(5L, (next.findWidget(clock.id) as WidgetItem).photo)
         assertEquals(1, next.findStack("s")!!.current)
         // A size the stack doesn't have drops the widget from it.
-        assertEquals(listOf(hosted, battery), layout.updateWidget(clock.copy(size = WidgetSize.Medium), 24).findStack("s")!!.items)
+        assertEquals(listOf(hosted, battery), layout.updateWidget(clock.copy(size = WidgetSize.Medium)).findStack("s")!!.items)
     }
 
     @Test
@@ -148,11 +148,11 @@ class WidgetStackTest {
 
     @Test
     fun stackTakesOneSlotOnTheGrid() {
-        val layout = page(stack, *Array(20) { AppItem("a$it") }).withPageCells(24)
+        val layout = page(stack, *Array(20) { AppItem("a$it") }).withPageCells()
         assertEquals(0, layout.cells["s"])
         // A 2×2 stack covers cells 0, 1, 4, 5: the first app goes to cell 2.
         assertEquals(2, layout.cells["a0"])
-        assertEquals(listOf(21), layout.normalized(24).pages.map { it.size })
+        assertEquals(listOf(21), layout.normalized().pages.map { it.size })
     }
 
     @Test

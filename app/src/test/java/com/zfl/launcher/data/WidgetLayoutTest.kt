@@ -10,8 +10,8 @@ class WidgetLayoutTest {
 
     @Test
     fun widgetAddedAtTopOfPagePushesAppsDown() {
-        val layout = LayoutData(pages = listOf(apps(*Array(20) { "a$it" })), dock = emptyList(), today = emptyList())
-        val next = layout.addWidget(clock, WidgetTarget.Page(0), pageCapacity = 20)
+        val layout = LayoutData(pages = listOf(apps(*Array(20) { "a$it" })), dock = emptyList(), today = emptyList(), grid = GridSpec(4, 5))
+        val next = layout.addWidget(clock, WidgetTarget.Page(0))
         assertEquals(clock, next.pages[0][0])
         // A small widget takes 4 cells of the 4×5 page, so 4 apps move to a new page.
         assertEquals(listOf(17, 4), next.pages.map { it.size })
@@ -22,15 +22,15 @@ class WidgetLayoutTest {
     fun widgetAddedToTodayGoesLast() {
         val layout = LayoutData(pages = listOf(apps("a")), dock = emptyList(), today = listOf(clock))
         val battery = WidgetItem("w2", WidgetKind.Battery, WidgetSize.Small)
-        assertEquals(listOf(clock, battery), layout.addWidget(battery, WidgetTarget.Today, 24).today)
+        assertEquals(listOf(clock, battery), layout.addWidget(battery, WidgetTarget.Today).today)
     }
 
     @Test
     fun resizeAndRemoveWorkOnPagesAndToday() {
         val layout = LayoutData(pages = listOf(listOf(clock) + apps("a")), dock = emptyList(), today = listOf(clock.copy(id = "t")))
-        val resized = layout.updateWidget(clock.copy(size = WidgetSize.Medium), 24)
+        val resized = layout.updateWidget(clock.copy(size = WidgetSize.Medium))
         assertEquals(WidgetSize.Medium, (resized.findWidget("w1") as? WidgetItem)?.size)
-        val removed = resized.removeWidget("w1", 24).removeWidget("t", 24)
+        val removed = resized.removeWidget("w1").removeWidget("t")
         assertTrue(removed.allWidgets().isEmpty())
         assertEquals(setOf("a"), removed.allAppKeys())
     }
@@ -38,8 +38,8 @@ class WidgetLayoutTest {
     @Test
     fun widgetsCannotGoToDockOrFolders() {
         val layout = LayoutData(pages = listOf(listOf(clock) + apps("a")), dock = emptyList(), today = emptyList())
-        assertEquals(layout, layout.move(clock, DropPosition.Dock(0), 24) { "" })
-        assertEquals(layout, layout.move(AppItem("a"), DropPosition.Merge("w1"), 24) { "" })
+        assertEquals(layout, layout.move(clock, DropPosition.Dock(0)) { "" })
+        assertEquals(layout, layout.move(AppItem("a"), DropPosition.Merge("w1")) { "" })
     }
 
     @Test
@@ -49,19 +49,19 @@ class WidgetLayoutTest {
             dock = apps("d"),
             today = listOf(WidgetItem("t", WidgetKind.Weather, WidgetSize.Large)),
         )
-        assertEquals(layout, LayoutData.fromJson(layout.toJson()))
+        assertEquals(layout, layoutFromJson(layout.toJson(), GridSpec.Default))
     }
 
     @Test
     fun layoutSavedBeforeWidgetsGetsDefaultToday() {
         val old = """{"version":1,"pages":[[{"app":"a"}]],"dock":[],"removed":[]}"""
-        assertEquals(DEFAULT_TODAY_WIDGETS, LayoutData.fromJson(old)?.today)
+        assertEquals(DEFAULT_TODAY_WIDGETS, layoutFromJson(old, GridSpec.Default)?.today)
     }
 
     @Test
     fun reconcileKeepsWidgets() {
         val layout = LayoutData(pages = listOf(listOf(clock) + apps("a")), dock = emptyList(), today = emptyList())
-        assertEquals(clock, layout.reconcile(listOf("a", "b"), 24).pages[0][0])
+        assertEquals(clock, layout.reconcile(listOf("a", "b")).pages[0][0])
     }
 
     private val hosted = AppWidgetItem("appwidget-7", 7, "com.example/.Provider", Span(4, 1))
@@ -69,24 +69,24 @@ class WidgetLayoutTest {
     @Test
     fun hostedWidgetRoundTripsAndFlowsWithApps() {
         val layout = LayoutData(pages = listOf(listOf(hosted) + apps("a", "b")), dock = emptyList(), today = listOf(hosted.copy(id = "t", appWidgetId = 8)))
-        assertEquals(layout, LayoutData.fromJson(layout.toJson()))
+        assertEquals(layout, layoutFromJson(layout.toJson(), GridSpec.Default))
         // A 4×1 widget takes the first row; apps start on the second.
-        assertEquals(listOf(0, 4, 5), packCells(layout.pages[0].map { it.span }, 4, 6))
+        assertEquals(listOf(0, 4, 5), packCells(layout.pages[0].map { it.span }, GridSpec(4, 6)))
     }
 
     @Test
     fun hostedWidgetsOfUninstalledAppsAreRemoved() {
         val layout = LayoutData(pages = listOf(listOf(hosted) + apps("a")), dock = emptyList(), today = listOf(hosted.copy(id = "t", appWidgetId = 8)))
-        val next = layout.withoutDeadAppWidgets(isAlive = { it == 8 }, pageCapacity = 24)
+        val next = layout.withoutDeadAppWidgets(isAlive = { it == 8 })
         assertEquals(listOf(apps("a")), next.pages)
         assertEquals(1, next.today.size)
-        assertEquals(layout, layout.withoutDeadAppWidgets(isAlive = { true }, pageCapacity = 24))
+        assertEquals(layout, layout.withoutDeadAppWidgets(isAlive = { true }))
     }
 
     @Test
     fun appWidgetSizesRespectMinAndMax() {
-        val spans = appWidgetSpans(default = Span(4, 2), resizable = true, min = Span(2, 2), max = Span(4, 2))
+        val spans = appWidgetSpans(default = Span(4, 2), resizable = true, min = Span(2, 2), max = Span(4, 2), grid = GridSpec.Default)
         assertEquals(listOf(Span(2, 2), Span(4, 2)), spans)
-        assertEquals(listOf(Span(2, 1)), appWidgetSpans(Span(2, 1), resizable = false, min = Span(1, 1), max = null))
+        assertEquals(listOf(Span(2, 1)), appWidgetSpans(Span(2, 1), resizable = false, min = Span(1, 1), max = null, grid = GridSpec.Default))
     }
 }

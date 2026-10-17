@@ -1,8 +1,5 @@
 package com.zfl.launcher.data
 
-import org.json.JSONArray
-import org.json.JSONObject
-
 /**
  * One persisted thing on the home screen or in the dock: an app or a folder of apps.
  * Apps are referenced by [AppInfo.key], so the layout survives app updates.
@@ -36,8 +33,20 @@ data class LayoutData(
     val removed: Set<String> = emptySet(),
     /** Widgets on the Today page (left of the first home page), top to bottom. */
     val today: List<PageWidget> = DEFAULT_TODAY_WIDGETS,
-    /** Top-left grid cell by item id, for home pages only. */
+    /** Top-left grid cell by item id, for home pages only, addressed in [grid]. */
     val cells: Map<String, Int> = emptyMap(),
+    /**
+     * Grid of the home pages. It is saved with the cells (see [toJson]), so the two always
+     * agree; every operation below places items on this grid.
+     */
+    val grid: GridSpec = GridSpec.Default,
+    /**
+     * Every installed app this layout has already seen (hidden ones and those of a paused
+     * profile included), so [reconcile] can tell a new install from an app that was simply
+     * not on the Home Screen. Null in layouts saved before it existed: the next reconcile
+     * fills it in without treating any installed app as new.
+     */
+    val known: Set<String>? = null,
 ) {
     /** Every app key referenced anywhere, including inside folders. */
     fun allAppKeys(): Set<String> = (pages.flatten() + dock).flatMapTo(mutableSetOf()) { item ->
@@ -51,92 +60,8 @@ data class LayoutData(
     fun findFolder(id: String): FolderItem? =
         (pages.flatten() + dock).firstOrNull { it.id == id } as? FolderItem
 
-    fun toJson(): String = JSONObject()
-        .put("version", 2)
-        .put("pages", JSONArray(pages.map { page -> JSONArray(page.map(::itemToJson)) }))
-        .put("dock", JSONArray(dock.map(::itemToJson)))
-        .put("removed", JSONArray(removed.toList()))
-        .put("today", JSONArray(today.map(::itemToJson)))
-        .put("cells", JSONObject(cells))
-        .toString()
-
     companion object {
         val Empty: LayoutData = LayoutData(pages = listOf(emptyList()), dock = emptyList())
-
-        /** Parses [toJson] output; returns null for unreadable data. */
-        fun fromJson(json: String): LayoutData? = runCatching {
-            val root = JSONObject(json)
-            val pages = root.getJSONArray("pages").let { arr ->
-                List(arr.length()) { i -> arr.getJSONArray(i).toItems() }
-            }
-            val removed = root.optJSONArray("removed")?.let { arr -> List(arr.length()) { arr.getString(it) }.toSet() }
-            // Layouts saved before widgets existed get the default Today page.
-            val today = root.optJSONArray("today")?.toItems()?.filterIsInstance<PageWidget>() ?: DEFAULT_TODAY_WIDGETS
-            val cells = root.optJSONObject("cells")?.let { saved ->
-                saved.keys().asSequence().mapNotNull { id ->
-                    saved.optInt(id, -1).takeIf { it >= 0 }?.let { id to it }
-                }.toMap()
-            }.orEmpty()
-            LayoutData(pages, root.getJSONArray("dock").toItems(), removed.orEmpty(), today, cells)
-        }.getOrNull()
-
-        private fun itemToJson(item: HomeItem): JSONObject = when (item) {
-            is AppItem -> JSONObject().put("app", item.appKey)
-            is FolderItem -> JSONObject()
-                .put("folder", item.id)
-                .put("name", item.name)
-                .put("apps", JSONArray(item.apps))
-            is WidgetItem -> JSONObject()
-                .put("widget", item.id)
-                .put("kind", item.kind.name)
-                .put("size", item.size.name)
-                .apply { item.photo?.let { put("photo", it) } }
-            is AppWidgetItem -> JSONObject()
-                .put("appwidget", item.id)
-                .put("widgetId", item.appWidgetId)
-                .put("provider", item.provider)
-                .put("cols", item.span.columns)
-                .put("rows", item.span.rows)
-            // "widget" + an unknown "kind" make builds without stacks skip this entry instead of
-            // failing to read the whole layout.
-            is WidgetStack -> JSONObject()
-                .put("stack", item.id)
-                .put("widget", item.id)
-                .put("kind", "stack")
-                .put("size", item.size.name)
-                .put("current", item.current)
-                .put("items", JSONArray(item.items.map(::itemToJson)))
-        }
-
-        /** Entries this version can't read (from a newer one) are skipped, the rest is kept. */
-        private fun JSONArray.toItems(): List<HomeItem> = List(length()) { i ->
-            val obj = optJSONObject(i) ?: return@List null
-            when {
-                obj.has("stack") -> {
-                    val size = WidgetSize.entries.firstOrNull { it.name == obj.optString("size") } ?: return@List null
-                    val items = obj.optJSONArray("items")?.toItems()?.filterIsInstance<PageWidget>().orEmpty()
-                    WidgetStack(obj.getString("stack"), size, items, obj.optInt("current", 0)).normalizedStack()
-                }
-                obj.has("folder") -> {
-                    val apps = obj.getJSONArray("apps")
-                    FolderItem(obj.getString("folder"), obj.optString("name"), List(apps.length()) { apps.getString(it) })
-                }
-                obj.has("widget") -> {
-                    // Unknown kinds/sizes (from a newer version) are skipped instead of failing the whole layout.
-                    val kind = WidgetKind.entries.firstOrNull { it.name == obj.optString("kind") } ?: return@List null
-                    val size = WidgetSize.entries.firstOrNull { it.name == obj.optString("size") } ?: kind.sizes.first()
-                    WidgetItem(obj.getString("widget"), kind, size, obj.optLong("photo").takeIf { obj.has("photo") })
-                }
-                obj.has("appwidget") -> AppWidgetItem(
-                    obj.getString("appwidget"),
-                    obj.getInt("widgetId"),
-                    obj.getString("provider"),
-                    Span(obj.optInt("cols", 4).coerceIn(1, 4), obj.optInt("rows", 2).coerceIn(1, 6)),
-                )
-                obj.has("app") -> AppItem(obj.getString("app"))
-                else -> null
-            }
-        }.filterNotNull()
     }
 }
 
@@ -161,49 +86,86 @@ val DOCK_CAPACITY_OPTIONS: List<Int> = listOf(4, 5)
 
 // region Pure layout operations. Each returns a new LayoutData; nothing is mutated.
 
+/** Profile part of an [AppInfo.key] ("10" for a work profile), as used by [reconcile]. */
+fun userOf(appKey: String): String = appKey.substringAfterLast('#', "")
+
 /**
- * Brings the layout in sync with [installed] (the visible apps): drops uninstalled or
- * hidden apps, dissolves folders left with one app, and appends new (or un-hidden) apps
- * at the end, like iOS.
+ * Brings the layout in sync with the installed apps, like iOS: drops uninstalled or hidden
+ * apps, dissolves folders left with one app, and appends apps that should be on the Home
+ * Screen but aren't at the end.
+ *
+ * Which apps are appended: a new install (not in [LayoutData.known]) unless [newApps] is
+ * [NewAppPlacement.LibraryOnly], which marks it removed instead; and an app that left the
+ * layout without being removed (an un-hidden app returns, it isn't a new install). Apps the
+ * user removed stay removed. Changing [newApps] only affects apps installed afterwards.
+ *
+ * @param installed visible apps (installed, not hidden), in the order new ones are appended.
+ * @param hidden installed but hidden apps: never placed, but known and removed stay remembered.
+ * @param unavailableUsers profiles ([userOf]) that exist but are paused or locked now. Their
+ *   apps missing from the list are kept in place, so the Home Screen doesn't lose them.
  */
-fun LayoutData.reconcile(installed: List<String>, pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
-    val installedSet = installed.toSet()
+fun LayoutData.reconcile(
+    installed: List<String>,
+    dockCapacity: Int = DEFAULT_DOCK_CAPACITY,
+    hidden: Set<String> = emptySet(),
+    unavailableUsers: Set<String> = emptySet(),
+    newApps: NewAppPlacement = NewAppPlacement.HomeAndLibrary,
+): LayoutData {
+    val visible = installed.toSet()
+    val present = visible + hidden
+    fun suspended(key: String) = key !in present && userOf(key) in unavailableUsers
+    fun keep(key: String) = key in visible || suspended(key)
+    fun remembered(key: String) = key in present || suspended(key)
     fun clean(items: List<HomeItem>): List<HomeItem> = items.mapNotNull { item ->
         when (item) {
-            is AppItem -> item.takeIf { it.appKey in installedSet }
-            is FolderItem -> item.copy(apps = item.apps.filter { it in installedSet }).simplified()
+            is AppItem -> item.takeIf { keep(it.appKey) }
+            is FolderItem -> item.copy(apps = item.apps.filter(::keep)).simplified()
             is PageWidget -> item
         }
     }
 
     val cleanedPages = pages.map(::clean)
     val inherited = pages.flatten().filterIsInstance<FolderItem>().mapNotNull { folder ->
-        val remaining = folder.apps.filter { it in installedSet }
+        val remaining = folder.apps.filter(::keep)
         if (remaining.size == 1) cells[folder.id]?.let { remaining.single() to it } else null
     }.toMap()
-    val cleaned = copy(pages = cleanedPages, dock = clean(dock), cells = cells + inherited,
-        removed = removed.filterTo(mutableSetOf()) { it in installedSet })
-    val known = cleaned.allAppKeys()
-    val newApps = installed.filter { it !in known && it !in cleaned.removed }.map(::AppItem)
-    if (newApps.isEmpty()) return cleaned.normalized(pageCapacity, dockCapacity)
+    val placed = (cleanedPages.flatten() + clean(dock)).flatMapTo(HashSet()) { item ->
+        when (item) {
+            is AppItem -> listOf(item.appKey)
+            is FolderItem -> item.apps
+            is PageWidget -> emptyList()
+        }
+    }
+    // Seen for the first time; null `known` (an older layout) treats nothing as new.
+    val discovered = known?.let { present - it }.orEmpty()
+    val libraryOnly = if (newApps == NewAppPlacement.LibraryOnly) discovered - placed else emptySet()
+    val cleaned = copy(
+        pages = cleanedPages,
+        dock = clean(dock),
+        cells = cells + inherited,
+        removed = removed.filterTo(mutableSetOf(), ::remembered) + libraryOnly,
+        known = known.orEmpty().filterTo(mutableSetOf(), ::remembered) + present,
+    )
+    val toPlace = installed.filter { it !in placed && it !in cleaned.removed }.map(::AppItem)
+    if (toPlace.isEmpty()) return cleaned.normalized(dockCapacity)
 
     val pages = cleaned.pages.toMutableList()
     val last = pages.lastOrNull().orEmpty()
-    pages[pages.lastIndex.coerceAtLeast(0)] = last + newApps
-    return cleaned.copy(pages = pages).normalized(pageCapacity, dockCapacity)
+    pages[pages.lastIndex.coerceAtLeast(0)] = last + toPlace
+    return cleaned.copy(pages = pages).normalized(dockCapacity)
 }
 
 /**
  * Pushes overflow to the following pages (cascading) and removes empty pages. Dock items
  * beyond [dockCapacity] (the user chose a smaller dock) move to the end of the last page.
  */
-fun LayoutData.normalized(pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
+fun LayoutData.normalized(dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
     val overflow = dock.drop(dockCapacity)
     val withOverflow = if (overflow.isEmpty()) pages else pages.dropLast(1) + listOf(pages.lastOrNull().orEmpty() + overflow)
-    val arranged = cascadePages(withOverflow, pageCapacity, dropEmpty = cells.isEmpty(), cell = { cells[it.id] }) { it.span }
+    val arranged = cascadePages(withOverflow, grid, dropEmpty = cells.isEmpty(), cell = { cells[it.id] }) { it.span }
         .let { pages -> if (cells.isEmpty()) pages else pages.dropLastWhile { it.isEmpty() }.ifEmpty { listOf(emptyList()) } }
     val next = copy(pages = arranged, dock = dock.take(dockCapacity))
-    return if (cells.isEmpty()) next else next.withPageCells(pageCapacity)
+    return if (cells.isEmpty()) next else next.withPageCells()
 }
 
 /** Removes the app or folder [id] from wherever it is; apps inside folders are taken out too. */
@@ -233,16 +195,16 @@ fun LayoutData.without(id: String): LayoutData {
 }
 
 /** "Add to Home Screen" (from the App Library): appends the app to the last page. */
-fun LayoutData.addToHome(appKey: String, pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
+fun LayoutData.addToHome(appKey: String, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData {
     if (appKey in allAppKeys()) return this
     val pages = pages.toMutableList()
     pages[pages.lastIndex] = pages.last() + AppItem(appKey)
-    return copy(pages = pages, removed = removed - appKey).normalized(pageCapacity, dockCapacity)
+    return copy(pages = pages, removed = removed - appKey).normalized(dockCapacity)
 }
 
 /** "Remove from Home Screen": the app leaves the layout and is not re-added automatically. */
-fun LayoutData.removeFromHome(appKey: String, pageCapacity: Int, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData =
-    without(appKey).copy(removed = removed + appKey).normalized(pageCapacity, dockCapacity)
+fun LayoutData.removeFromHome(appKey: String, dockCapacity: Int = DEFAULT_DOCK_CAPACITY): LayoutData =
+    without(appKey).copy(removed = removed + appKey).normalized(dockCapacity)
 
 /**
  * Moves [item] (an app or folder that may currently be anywhere) to [position].
@@ -251,11 +213,10 @@ fun LayoutData.removeFromHome(appKey: String, pageCapacity: Int, dockCapacity: I
 fun LayoutData.move(
     item: HomeItem,
     position: DropPosition,
-    pageCapacity: Int,
     dockCapacity: Int = DEFAULT_DOCK_CAPACITY,
     folderName: () -> String,
 ): LayoutData {
-    val result = moveUnchecked(item, position, pageCapacity, dockCapacity, folderName)
+    val result = moveUnchecked(item, position, dockCapacity, folderName)
         // An app placed on the Home Screen is no longer "removed".
         .let { it.copy(removed = it.removed - it.allAppKeys()) }
     // Safety net: a drop must never lose an app (e.g. merging onto a folder that dissolved
@@ -266,11 +227,10 @@ fun LayoutData.move(
 private fun LayoutData.moveUnchecked(
     item: HomeItem,
     position: DropPosition,
-    pageCapacity: Int,
     dockCapacity: Int,
     folderName: () -> String,
 ): LayoutData {
-    if (position is DropPosition.PageCell) return moveToCell(item, position, pageCapacity, dockCapacity)
+    if (position is DropPosition.PageCell) return moveToCell(item, position, dockCapacity)
     if (position is DropPosition.InFolder) {
         // Reorder in place: taking the app out first could dissolve a two-app folder.
         val appKey = (item as? AppItem)?.appKey ?: return this
@@ -284,7 +244,7 @@ private fun LayoutData.moveUnchecked(
     }
     // A widget dropped on a widget of its size makes (or grows) a stack.
     if (item is PageWidget && position is DropPosition.Merge) {
-        return dropOnWidget(item, position.targetId, "stack-${System.currentTimeMillis()}", pageCapacity, dockCapacity)
+        return dropOnWidget(item, position.targetId, "stack-${System.currentTimeMillis()}", dockCapacity)
     }
     // Widgets live only on home pages: no dock, no folders.
     if (item is PageWidget && position !is DropPosition.Page) return this
@@ -296,14 +256,14 @@ private fun LayoutData.moveUnchecked(
             val page = pages[position.page].toMutableList()
             page.add(position.index.coerceIn(0, page.size), item)
             pages[position.page] = page
-            rest.copy(pages = pages).normalized(pageCapacity, dockCapacity)
+            rest.copy(pages = pages).normalized(dockCapacity)
         }
 
         is DropPosition.Dock -> {
             if (rest.dock.size >= dockCapacity) return this
             val dock = rest.dock.toMutableList()
             dock.add(position.index.coerceIn(0, dock.size), item)
-            rest.copy(dock = dock).normalized(pageCapacity, dockCapacity)
+            rest.copy(dock = dock).normalized(dockCapacity)
         }
 
         is DropPosition.InFolder, is DropPosition.PageCell -> this // handled above
@@ -323,7 +283,7 @@ private fun LayoutData.moveUnchecked(
                     )
                     else -> existing
                 }
-            }.normalized(pageCapacity, dockCapacity)
+            }.normalized(dockCapacity)
         }
     }
 }
