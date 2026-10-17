@@ -8,6 +8,19 @@ package com.zfl.launcher.settings
 val FLAG_REGIONS: Map<String, String> = mapOf(
     "en" to "US",
     "ru" to "RU",
+    "pl" to "PL",
+    "uk" to "UA",
+    "be" to "BY",
+    "es" to "ES",
+    "fr" to "FR",
+    "it" to "IT",
+    "de" to "DE",
+    "zh" to "CN",
+    "ja" to "JP",
+    "pt" to "PT",
+    "kk" to "KZ",
+    "tr" to "TR",
+    "sr" to "RS",
 )
 
 /** Language subtag of a BCP 47 tag: "pt-BR" → "pt". */
