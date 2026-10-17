@@ -26,6 +26,13 @@ class SettingsStateTest {
     }
 
     @Test
+    fun sanitizedClampsGlassRefraction() {
+        assertEquals(1f, SettingsState(glassRefraction = 4f).sanitized().glassRefraction)
+        assertEquals(0f, SettingsState(glassRefraction = -1f).sanitized().glassRefraction)
+        assertEquals(SettingsState.DEFAULT_GLASS_REFRACTION, SettingsState(glassRefraction = Float.NaN).sanitized().glassRefraction)
+    }
+
+    @Test
     fun defaultsAreAlreadySanitized() {
         assertEquals(SettingsState(), SettingsState().sanitized())
     }

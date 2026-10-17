@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.zfl.launcher.data.LayoutStore
+import com.zfl.launcher.ui.glass.GlassMode
 import com.zfl.launcher.ui.icon.IconAppearance
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,6 +56,9 @@ class LauncherSettings private constructor(context: Context) {
             putBoolean(KEY_RESUME_ANIM, next.resumeAnimation)
             putFloat(KEY_GLASS_TINT, next.glassTint)
             putBoolean(KEY_GLASS_EDGE, next.glassEdge)
+            putString(KEY_GLASS_MODE, next.glassMode.name)
+            putFloat(KEY_GLASS_REFRACTION, next.glassRefraction)
+            putBoolean(KEY_GLASS_TILT, next.glassTiltLight)
             putBoolean(KEY_HOME_BLUR, next.homeBlur)
             putFloat(KEY_HOME_BLUR_RADIUS, next.homeBlurRadius)
             putFloat(KEY_MENU_DIM, next.menuDim)
@@ -74,6 +78,7 @@ class LauncherSettings private constructor(context: Context) {
             putString(KEY_SEARCH_SWIPE, next.searchSwipe.name)
             putBoolean(KEY_APP_LIBRARY, next.appLibrary)
             putStringSet(KEY_HIDDEN_MENU, next.hiddenMenuActions.map { it.name }.toSet())
+            putBoolean(KEY_DYNAMIC_COLOR, next.dynamicColor)
             putBoolean(KEY_ONBOARDING_DONE, next.onboardingDone)
         }
     }
@@ -103,6 +108,7 @@ class LauncherSettings private constructor(context: Context) {
     fun setPageTransition(value: PageTransition): Unit = update { it.copy(pageTransition = value) }
     fun setTextScale(value: Float): Unit = update { it.copy(textScale = value) }
     fun setGridRows(value: Int): Unit = update { it.copy(gridRows = value) }
+    fun setDynamicColor(value: Boolean): Unit = update { it.copy(dynamicColor = value) }
 
     fun setMenuActionEnabled(action: MenuAction, enabled: Boolean): Unit = update {
         it.copy(hiddenMenuActions = if (enabled) it.hiddenMenuActions - action else it.hiddenMenuActions + action)
@@ -151,6 +157,9 @@ class LauncherSettings private constructor(context: Context) {
         resumeAnimation = prefs.getBoolean(KEY_RESUME_ANIM, true),
         glassTint = prefs.getFloat(KEY_GLASS_TINT, Defaults.glassTint),
         glassEdge = prefs.getBoolean(KEY_GLASS_EDGE, Defaults.glassEdge),
+        glassMode = GlassMode.fromStored(prefs.getString(KEY_GLASS_MODE, null), Defaults.glassMode),
+        glassRefraction = prefs.getFloat(KEY_GLASS_REFRACTION, Defaults.glassRefraction),
+        glassTiltLight = prefs.getBoolean(KEY_GLASS_TILT, Defaults.glassTiltLight),
         homeBlur = prefs.getBoolean(KEY_HOME_BLUR, Defaults.homeBlur),
         homeBlurRadius = prefs.getFloat(KEY_HOME_BLUR_RADIUS, Defaults.homeBlurRadius),
         menuDim = prefs.getFloat(KEY_MENU_DIM, Defaults.menuDim),
@@ -177,6 +186,7 @@ class LauncherSettings private constructor(context: Context) {
         hiddenApps = prefs.getStringSet(KEY_HIDDEN, emptySet()).orEmpty().toSet(),
         customLabels = readJsonMap(KEY_LABELS) { obj, key -> obj.getString(key) },
         customIcons = readJsonMap(KEY_ICONS) { obj, key -> obj.getLong(key) },
+        dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, Defaults.dynamicColor),
         onboardingDone = prefs.getBoolean(KEY_ONBOARDING_DONE, Defaults.onboardingDone),
     )
 
@@ -202,6 +212,9 @@ class LauncherSettings private constructor(context: Context) {
         private const val KEY_ICONS = "custom_icons"
         private const val KEY_GLASS_TINT = "glass_tint"
         private const val KEY_GLASS_EDGE = "glass_edge"
+        private const val KEY_GLASS_MODE = "glass_mode"
+        private const val KEY_GLASS_REFRACTION = "glass_refraction"
+        private const val KEY_GLASS_TILT = "glass_tilt_light"
         private const val KEY_HOME_BLUR = "home_blur"
         private const val KEY_HOME_BLUR_RADIUS = "home_blur_radius"
         private const val KEY_MENU_DIM = "menu_dim"
@@ -223,6 +236,7 @@ class LauncherSettings private constructor(context: Context) {
         private const val KEY_APP_LIBRARY = "app_library"
         private const val KEY_HIDDEN_MENU = "hidden_menu_actions"
         private const val KEY_ONBOARDING_DONE = "onboarding_done"
+        private const val KEY_DYNAMIC_COLOR = "dynamic_color"
 
         @Volatile
         private var instance: LauncherSettings? = null

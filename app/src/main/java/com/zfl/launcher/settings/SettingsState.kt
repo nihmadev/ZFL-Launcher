@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.zfl.launcher.data.DEFAULT_DOCK_CAPACITY
 import com.zfl.launcher.data.DOCK_CAPACITY_OPTIONS
+import com.zfl.launcher.ui.glass.GlassMode
 import com.zfl.launcher.ui.icon.DEFAULT_ICON_TINT
 import com.zfl.launcher.ui.icon.IconAppearance
 import com.zfl.launcher.ui.theme.Tokens
@@ -36,6 +37,12 @@ data class SettingsState(
     val glassTint: Float = DEFAULT_GLASS_TINT,
     /** Thin highlight along the edge of glass surfaces. */
     val glassEdge: Boolean = true,
+    /** Frosted or Liquid glass; Liquid needs Android 13+ and falls back to Frosted elsewhere. */
+    val glassMode: GlassMode = DEFAULT_GLASS_MODE,
+    /** How strongly the rim of Liquid glass bends the wallpaper, 0..1. */
+    val glassRefraction: Float = DEFAULT_GLASS_REFRACTION,
+    /** The highlight of Liquid glass follows the tilt of the phone. */
+    val glassTiltLight: Boolean = true,
     /** Blur the home screen behind folders, menus and search. */
     val homeBlur: Boolean = true,
     /** Radius of [homeBlur] in dp, see [MIN_HOME_BLUR]..[MAX_HOME_BLUR]. */
@@ -83,6 +90,9 @@ data class SettingsState(
     /** App key → version stamp of a custom icon image stored in [LauncherSettings.customIconFile]. */
     val customIcons: Map<String, Long> = emptyMap(),
 
+    /** Accent color of buttons, switches and sliders taken from the wallpaper (Dynamic Color). */
+    val dynamicColor: Boolean = false,
+
     /** The first-run setup was finished with "Get Started" (or the install predates it, see [isOnboardingNeeded]). */
     val onboardingDone: Boolean = false,
 ) {
@@ -107,6 +117,7 @@ data class SettingsState(
         textScale = textScale.coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE),
         gridRows = gridRows.coerceIn(GRID_ROW_OPTIONS.first(), GRID_ROW_OPTIONS.last()),
         glassTint = glassTint.coerceIn(0f, MAX_GLASS_TINT),
+        glassRefraction = if (glassRefraction.isNaN()) DEFAULT_GLASS_REFRACTION else glassRefraction.coerceIn(0f, 1f),
         homeBlurRadius = homeBlurRadius.coerceIn(MIN_HOME_BLUR, MAX_HOME_BLUR),
         menuDim = menuDim.coerceIn(0f, MAX_MENU_DIM),
         iconScale = iconScale.coerceIn(MIN_ICON_SCALE, MAX_ICON_SCALE),
@@ -123,6 +134,8 @@ data class SettingsState(
 
         const val DEFAULT_GLASS_TINT = 0.12f
         const val MAX_GLASS_TINT = 0.5f
+        val DEFAULT_GLASS_MODE: GlassMode = GlassMode.Liquid
+        const val DEFAULT_GLASS_REFRACTION: Float = 0.8f
         const val DEFAULT_HOME_BLUR = 20f
         const val MIN_HOME_BLUR = 4f
         const val MAX_HOME_BLUR = 40f

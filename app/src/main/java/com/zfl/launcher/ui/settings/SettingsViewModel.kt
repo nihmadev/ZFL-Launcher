@@ -49,8 +49,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Reloads wallpaper-based images (e.g. after the user granted access). */
     fun refreshGlass() {
-        viewModelScope.launch { _glass.value = WallpaperBlur.load(getApplication()) }
-        viewModelScope.launch { _wallpaper.value = WallpaperBlur.loadPreview(getApplication()) }
+        viewModelScope.launch {
+            // The sharp preview doubles as the rim of Liquid glass in the glass preview.
+            val sharp = WallpaperBlur.loadPreview(getApplication())
+            _wallpaper.value = sharp
+            _glass.value = WallpaperBlur.load(getApplication(), sharp)
+        }
     }
 
     /** The home screen as it would look with [rows] grid rows, for the Screen Grid preview. */
@@ -105,7 +109,6 @@ interface SettingsActions {
     val isHomeRoleAvailable: Boolean
 
     fun requestDefaultHome()
-    fun openLanguageSettings()
     fun requestWallpaperAccess()
     /** Switches ZFL's UI language (`null` = follow the system); recreates the activity. */
     fun setAppLanguage(tag: String?)
