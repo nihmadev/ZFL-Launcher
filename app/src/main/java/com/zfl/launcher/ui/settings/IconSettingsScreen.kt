@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zfl.launcher.R
+import com.zfl.launcher.settings.IconArea
 import com.zfl.launcher.settings.SettingsState
 import com.zfl.launcher.ui.icon.ICON_TINT_PALETTE
 import com.zfl.launcher.ui.icon.IconAppearance
@@ -41,7 +42,7 @@ import com.zfl.launcher.ui.icon.LocalIconLoader
 private val Defaults = SettingsState()
 
 @Composable
-fun IconSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
+fun IconSettingsScreen(vm: SettingsViewModel, onOpenArea: (IconArea) -> Unit, onBack: () -> Unit) {
     val settings by vm.settings.state.collectAsStateWithLifecycle()
     // Local values while dragging; persisted when the finger is lifted.
     var scale by remember(settings.iconScale) { mutableFloatStateOf(settings.iconScale) }
@@ -99,6 +100,8 @@ fun IconSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
             }
         }
         item { SectionFooter(stringResource(R.string.icons_footer)) }
+        item { SectionHeader(stringResource(R.string.icons_section_areas)) }
+        item { SettingsCard { AreaIconRows(settings, onOpenArea) } }
         item { SectionHeader(stringResource(R.string.icons_section_appearance)) }
         item {
             SettingsCard {

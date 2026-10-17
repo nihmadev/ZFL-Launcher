@@ -1,6 +1,5 @@
 package com.zfl.launcher.ui.settings
 
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -18,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,7 +24,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,7 +43,6 @@ import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.settings.PageTransition
 import com.zfl.launcher.settings.SettingsState
-import com.zfl.launcher.ui.home.HomePreview
 import com.zfl.launcher.ui.home.pageTransition
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
@@ -110,56 +106,6 @@ fun GeneralSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, onBac
                     NavRow(Icons.Rounded.Wallpaper, stringResource(R.string.general_wallpaper_access), onClick = actions::requestWallpaperAccess)
                 }
             }
-        }
-    }
-}
-
-// endregion
-
-// region Screen grid
-
-/** Number of icon rows, with a live preview of the user's own home screen. Saved with the ✓ button, like iOS27L. */
-@Composable
-fun GridSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
-    val settings by vm.settings.state.collectAsStateWithLifecycle()
-    val apps by vm.repository.apps.collectAsStateWithLifecycle()
-    val wallpaper by vm.wallpaper.collectAsStateWithLifecycle()
-    var rows by remember { mutableIntStateOf(settings.gridRows) }
-    val options = SettingsState.GRID_ROW_OPTIONS
-
-    SettingsPage(
-        title = stringResource(R.string.row_grid),
-        onBack = onBack,
-        action = {
-            GlassCircleButton(Icons.Rounded.Check, stringResource(R.string.action_done), onClick = {
-                vm.settings.setGridRows(rows)
-                onBack()
-            })
-        },
-    ) {
-        item {
-            val shape = ContinuousRoundedShape(34.dp)
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Crossfade(targetState = rows, label = "gridPreview") { previewRows ->
-                    val preview = remember(apps, settings, previewRows) { vm.homePreview(apps, settings, previewRows) }
-                    HomePreview(
-                        state = preview,
-                        wallpaper = wallpaper,
-                        modifier = Modifier
-                            .width(232.dp)
-                            .clip(shape)
-                            .border(2.dp, Color.White.copy(alpha = 0.3f), shape),
-                    )
-                }
-            }
-        }
-        item {
-            SegmentedControl(
-                options = options.map { "4×$it" },
-                selectedIndex = options.indexOf(rows),
-                onSelect = { rows = options[it] },
-                modifier = Modifier.padding(top = 20.dp),
-            )
         }
     }
 }

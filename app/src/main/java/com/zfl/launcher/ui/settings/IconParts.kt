@@ -22,11 +22,20 @@ import com.zfl.launcher.ui.theme.Tokens
 
 /**
  * Live preview of real app icons at real size, drawn by the same loader as the home screen (so
- * in the saved appearance). [scale] and [corner] may be unsaved values while a slider is dragged:
- * the new shape is clipped on top until it is saved. Shared by Settings › Icons and the onboarding.
+ * in the saved appearance). [scale], [corner] and [labelScale] may be unsaved values while a
+ * slider is dragged: the bitmap keeps the saved [savedScale] until then, and the new shape is
+ * clipped on top. Shared by Settings › Icons, the sizes of each area and the onboarding.
  */
 @Composable
-fun IconPreviewRow(apps: List<AppInfo>, settings: SettingsState, scale: Float = settings.iconScale, corner: Float = settings.iconCorner) {
+fun IconPreviewRow(
+    apps: List<AppInfo>,
+    settings: SettingsState,
+    scale: Float = settings.iconScale,
+    corner: Float = settings.iconCorner,
+    savedScale: Float = settings.iconScale,
+    labelScale: Float = settings.labelScale,
+    showLabels: Boolean = settings.showLabels,
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -35,10 +44,10 @@ fun IconPreviewRow(apps: List<AppInfo>, settings: SettingsState, scale: Float = 
     ) {
         apps.forEach { app ->
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                AppIconImage(app, Modifier.clip(IconShape(corner)), size = Tokens.IconSize * scale)
-                if (settings.showLabels) {
+                AppIconImage(app, Modifier.clip(IconShape(corner)), size = Tokens.IconSize * scale, renderSize = Tokens.IconSize * savedScale)
+                if (showLabels) {
                     Spacer(Modifier.height(6.dp))
-                    IconLabel(settings.customLabels[app.key] ?: app.label)
+                    IconLabel(settings.customLabels[app.key] ?: app.label, scale = labelScale)
                 }
             }
         }

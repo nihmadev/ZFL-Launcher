@@ -141,8 +141,15 @@ fun AppListScreen(vm: SettingsViewModel, mode: AppListMode, onBack: () -> Unit) 
     }
 }
 
+/** One app as a flat capsule (cheap in long lists): icon, name, optional [subtitle], [trailing]. */
 @Composable
-private fun AppCapsule(app: AppInfo, label: String, onClick: () -> Unit, trailing: @Composable () -> Unit) {
+internal fun AppCapsule(
+    app: AppInfo,
+    label: String,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+    trailing: @Composable () -> Unit,
+) {
     val shape = ContinuousRoundedShape(22.dp)
     Box(
         Modifier
@@ -155,7 +162,10 @@ private fun AppCapsule(app: AppInfo, label: String, onClick: () -> Unit, trailin
         SettingsRow(onClick = onClick) {
             AppIconImage(app, size = 34.dp)
             Spacer(Modifier.width(14.dp))
-            RowTitle(label, modifier = Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                RowTitle(label)
+                if (subtitle != null) Text(subtitle, color = SettingsStyle.SecondaryText, fontSize = SettingsStyle.SubtitleSize, maxLines = 1)
+            }
             trailing()
         }
     }
