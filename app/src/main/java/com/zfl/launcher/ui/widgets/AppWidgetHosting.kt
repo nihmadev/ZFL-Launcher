@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.view.drawToBitmap
+import com.zfl.launcher.data.GridSpec
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.appWidgetSpans
 import kotlin.math.ceil
@@ -90,12 +91,12 @@ class AppWidgets private constructor(context: Context) {
             Span(cells(info.minWidth), cells(info.minHeight))
         }
 
-    /** Sizes the widget menu offers for this widget. */
-    fun spans(info: AppWidgetProviderInfo): List<Span> {
+    /** Sizes the widget menu offers for this widget: what its provider allows and fits [grid]. */
+    fun spans(info: AppWidgetProviderInfo, grid: GridSpec): List<Span> {
         val resizable = info.resizeMode != AppWidgetProviderInfo.RESIZE_NONE
         val min = Span(cells(info.minResizeWidth.takeIf { it > 0 } ?: info.minWidth), cells(info.minResizeHeight.takeIf { it > 0 } ?: info.minHeight))
         val max = if (info.maxResizeWidth > 0 && info.maxResizeHeight > 0) Span(cells(info.maxResizeWidth), cells(info.maxResizeHeight)) else null
-        return appWidgetSpans(defaultSpan(info), resizable, min, max)
+        return appWidgetSpans(defaultSpan(info), resizable, min, max, grid)
     }
 
     /** Cells needed for a size in px; a cell is about [CELL_DP] wide on a phone. */
@@ -149,7 +150,9 @@ class ZflWidgetHostView(context: Context) : AppWidgetHostView(context) {
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val longPress = Runnable {
         longPressed = true
-        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        if (com.zfl.launcher.settings.LauncherSettings.get(context).state.value.homeBehavior.haptics) {
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        }
         AppWidgetSnapshots.capture(appWidgetId, this)
         val location = IntArray(2).also(::getLocationInWindow)
         onLongPress?.invoke(Offset(location[0] + downX, location[1] + downY))
@@ -171,7 +174,7 @@ class ZflWidgetHostView(context: Context) : AppWidgetHostView(context) {
                 postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
             }
             MotionEvent.ACTION_MOVE -> if (kotlin.math.abs(event.x - downX) > slop || kotlin.math.abs(event.y - downY) > slop) removeCallbacks(longPress)
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> removeCallbacks(longPress)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> removeCallbacks(longPress)
         }
         // After a long press the gesture is ours: the widget's buttons get a cancel.
         return longPressed
