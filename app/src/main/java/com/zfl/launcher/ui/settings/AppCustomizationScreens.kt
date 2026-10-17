@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.settings.importCustomIcon
@@ -164,7 +165,7 @@ private fun AppCapsule(app: AppInfo, label: String, onClick: () -> Unit, trailin
 private fun ResetButton(onClick: () -> Unit) {
     Text(
         stringResource(R.string.action_reset),
-        color = SettingsStyle.Link,
+        color = LocalAccent.current.primary,
         fontSize = 15.sp,
         fontWeight = FontWeight.Medium,
         modifier = Modifier
@@ -211,7 +212,7 @@ private fun RenameDialog(originalLabel: String, currentLabel: String, onDismiss:
                     onValueChange = { text = it },
                     singleLine = true,
                     textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                    cursorBrush = SolidColor(SettingsStyle.Link),
+                    cursorBrush = SolidColor(LocalAccent.current.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { onSave(text.text) }),
                     modifier = Modifier
@@ -250,6 +251,6 @@ private fun DialogButton(text: String, modifier: Modifier, bold: Boolean, onClic
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = SettingsStyle.Link, fontSize = 17.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
+        Text(text, color = LocalAccent.current.primary, fontSize = 17.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
     }
 }

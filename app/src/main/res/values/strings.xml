@@ -23,10 +23,6 @@
 
     <!-- Settings: main page -->
     <string name="settings_title">Settings</string>
-    <string name="section_general">General</string>
-    <string name="section_transition">Transition</string>
-    <string name="section_icons">Icon Customization</string>
-    <string name="section_about">About</string>
     <string name="default_home_select">Select default home screen</string>
     <string name="default_home_active">ZFL is your home screen</string>
     <string name="row_general">General</string>
@@ -37,6 +33,7 @@
     <string name="row_hidden_apps">Hidden Apps</string>
     <string name="row_change_icon">Change App Icon</string>
     <string name="row_change_name">Change App Name</string>
+    <string name="row_dynamic_color">Dynamic Color</string>
     <string name="row_version">Version</string>
     <string name="row_license">License</string>
 
@@ -113,7 +110,6 @@
     <string name="search_web">Search the web for “%1$s”</string>
 
     <!-- Interface settings -->
-    <string name="section_interface">Interface</string>
     <string name="row_glass">Glass &amp; Blur</string>
     <string name="row_icons">Icons</string>
     <string name="row_home_screen">Home Screen &amp; Dock</string>
@@ -121,6 +117,11 @@
     <string name="glass_section_panels">Dock, pills and menus</string>
     <string name="glass_tint">Glass brightness</string>
     <string name="glass_edge">Edge highlight</string>
+    <string name="glass_style">Glass style</string>
+    <string name="glass_style_frosted">Frosted</string>
+    <string name="glass_style_liquid">Liquid</string>
+    <string name="glass_refraction">Refraction</string>
+    <string name="glass_tilt_light">Highlight follows tilt</string>
     <string name="glass_section_background">Background</string>
     <string name="glass_home_blur">Blur behind folders and menus</string>
     <string name="glass_home_blur_radius">Blur strength</string>

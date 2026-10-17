@@ -17,10 +17,6 @@
     <string name="action_save">Сохранить</string>
 
     <string name="settings_title">Настройки</string>
-    <string name="section_general">Основные</string>
-    <string name="section_transition">Переходы</string>
-    <string name="section_icons">Настройка иконок</string>
-    <string name="section_about">О лаунчере</string>
     <string name="default_home_select">Сделать рабочим столом по умолчанию</string>
     <string name="default_home_active">ZFL — ваш рабочий стол</string>
     <string name="row_general">Основные</string>
@@ -31,6 +27,7 @@
     <string name="row_hidden_apps">Скрытые приложения</string>
     <string name="row_change_icon">Сменить иконку</string>
     <string name="row_change_name">Сменить название</string>
+    <string name="row_dynamic_color">Динамический цвет</string>
     <string name="row_version">Версия</string>
     <string name="row_license">Лицензия</string>
 
@@ -105,7 +102,6 @@
     <string name="search_web">Искать в интернете «%1$s»</string>
 
     <!-- Interface settings -->
-    <string name="section_interface">Интерфейс</string>
     <string name="row_glass">Стекло и размытие</string>
     <string name="row_icons">Иконки</string>
     <string name="row_home_screen">Рабочий стол и Dock</string>
@@ -113,6 +109,11 @@
     <string name="glass_section_panels">Dock, пилюли и меню</string>
     <string name="glass_tint">Яркость стекла</string>
     <string name="glass_edge">Блик по краю</string>
+    <string name="glass_style">Стиль стекла</string>
+    <string name="glass_style_frosted">Матовое</string>
+    <string name="glass_style_liquid">Жидкое</string>
+    <string name="glass_refraction">Сила преломления</string>
+    <string name="glass_tilt_light">Блик следует за наклоном</string>
     <string name="glass_section_background">Фон</string>
     <string name="glass_home_blur">Размывать под папками и меню</string>
     <string name="glass_home_blur_radius">Сила размытия</string>

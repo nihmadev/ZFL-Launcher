@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.data.ImportSource
 
@@ -63,7 +64,7 @@ fun ImportScreen(vm: SettingsViewModel, onBack: () -> Unit) {
                         .fillMaxWidth()
                         .height(52.dp)
                         .clip(CircleShape)
-                        .background(SettingsStyle.Link)
+                        .background(LocalAccent.current.primary)
                         .clickable { state.confirming = true },
                     contentAlignment = Alignment.Center,
                 ) {

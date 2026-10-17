@@ -1,5 +1,19 @@
 package com.zfl.launcher.ui.settings
 
+import android.os.Build
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.runtime.mutableStateOf
+import com.zfl.launcher.ui.glass.GlassMode
+import com.zfl.launcher.ui.glass.GlassProfile
+import com.zfl.launcher.ui.glass.WallpaperBlur
+import com.zfl.launcher.ui.glass.glassStyle
+import com.zfl.launcher.ui.glass.isLiquidGlassSupported
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,9 +86,14 @@ internal fun sampleApps(vm: SettingsViewModel, count: Int): List<AppInfo> {
 @Composable
 fun GlassSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, onBack: () -> Unit) {
     val settings by vm.settings.state.collectAsStateWithLifecycle()
+    val wallpaper by vm.wallpaper.collectAsStateWithLifecycle()
     // Local values while dragging; persisted when the finger is lifted.
     var tint by remember(settings.glassTint) { mutableFloatStateOf(settings.glassTint) }
+    var refraction by remember(settings.glassRefraction) { mutableFloatStateOf(settings.glassRefraction) }
     var radius by remember(settings.homeBlurRadius) { mutableFloatStateOf(settings.homeBlurRadius) }
+    // Android 12 has no runtime shaders: the choice isn't offered and glass stays Frosted.
+    val liquidSupported = isLiquidGlassSupported(Build.VERSION.SDK_INT)
+    val liquid = liquidSupported && settings.glassMode == GlassMode.Liquid
 
     SettingsPage(
         title = stringResource(R.string.row_glass),
@@ -86,6 +105,9 @@ fun GlassSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, onBack:
                         blurEffect = Defaults.blurEffect,
                         glassTint = Defaults.glassTint,
                         glassEdge = Defaults.glassEdge,
+                        glassMode = Defaults.glassMode,
+                        glassRefraction = Defaults.glassRefraction,
+                        glassTiltLight = Defaults.glassTiltLight,
                         homeBlur = Defaults.homeBlur,
                         homeBlurRadius = Defaults.homeBlurRadius,
                     )
@@ -93,10 +115,23 @@ fun GlassSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, onBack:
             }
         },
     ) {
-        item { GlassPreview(sampleApps(vm, 4), GlassStyle(tint, settings.glassEdge), settings.blurEffect) }
+        item {
+            GlassPreview(sampleApps(vm, 4), settings.glassStyle(tint, refraction), settings.blurEffect, wallpaper)
+        }
         item { SectionHeader(stringResource(R.string.glass_section_panels)) }
         item {
             SettingsCard {
+                if (liquidSupported) {
+                    Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                        RowTitle(stringResource(R.string.glass_style))
+                        Spacer(Modifier.height(10.dp))
+                        SegmentedControl(
+                            options = GlassMode.entries.map { stringResource(it.labelRes) },
+                            selectedIndex = GlassMode.entries.indexOf(settings.glassMode),
+                            onSelect = { index -> vm.settings.update { it.copy(glassMode = GlassMode.entries[index]) } },
+                        )
+                    }
+                }
                 SwitchRow(stringResource(R.string.general_blur), settings.blurEffect, vm.settings::setBlurEffect)
                 SliderRow(
                     title = stringResource(R.string.glass_tint),
@@ -109,6 +144,20 @@ fun GlassSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, onBack:
                 SwitchRow(stringResource(R.string.glass_edge), settings.glassEdge, onCheckedChange = { value ->
                     vm.settings.update { it.copy(glassEdge = value) }
                 })
+                if (liquid) {
+                    SliderRow(
+                        title = stringResource(R.string.glass_refraction),
+                        value = refraction,
+                        valueText = percent(refraction),
+                        onValueChange = { refraction = it },
+                        onValueChangeFinished = { vm.settings.update { it.copy(glassRefraction = refraction) } },
+                        valueRange = 0f..1f,
+                        enabled = settings.blurEffect,
+                    )
+                    SwitchRow(stringResource(R.string.glass_tilt_light), settings.glassTiltLight, onCheckedChange = { value ->
+                        vm.settings.update { it.copy(glassTiltLight = value) }
+                    })
+                }
             }
         }
         item { SectionHeader(stringResource(R.string.glass_section_background)) }
@@ -140,10 +189,20 @@ fun GlassSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, onBack:
     }
 }
 
-/** A search pill and a small dock drawn with the glass style being edited. */
+private val GlassMode.labelRes: Int
+    get() = when (this) {
+        GlassMode.Frosted -> R.string.glass_style_frosted
+        GlassMode.Liquid -> R.string.glass_style_liquid
+    }
+
+/**
+ * A search pill and a small dock drawn with the glass style being edited, over a window onto
+ * the real wallpaper (sharp, as on the Home Screen), so both modes look as they will at home.
+ */
 @Composable
-private fun GlassPreview(apps: List<AppInfo>, style: GlassStyle, blur: Boolean) {
+private fun GlassPreview(apps: List<AppInfo>, style: GlassStyle, blur: Boolean, wallpaper: ImageBitmap?) {
     val source = LocalGlassSource.current
+    var origin by remember { mutableStateOf(Offset.Zero) }
     CompositionLocalProvider(
         LocalGlassStyle provides style,
         LocalGlassSource provides source.takeIf { blur },
@@ -151,13 +210,27 @@ private fun GlassPreview(apps: List<AppInfo>, style: GlassStyle, blur: Boolean) 
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
+                .padding(vertical = 12.dp)
+                .clip(PreviewShape)
+                .onGloballyPositioned { origin = it.positionInWindow() }
+                .drawBehind {
+                    // The wallpaper as laid out on screen, shifted so this box shows the part under it.
+                    if (wallpaper != null) {
+                        val k = WallpaperBlur.PREVIEW_DOWNSCALE
+                        drawImage(
+                            wallpaper,
+                            dstOffset = IntOffset(-origin.x.roundToInt(), -origin.y.roundToInt()),
+                            dstSize = IntSize(wallpaper.width * k, wallpaper.height * k),
+                        )
+                    }
+                }
+                .padding(vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Row(
                 Modifier
                     .height(Tokens.PillHeight)
-                    .glass(ContinuousRoundedShape(Tokens.PillHeight / 2))
+                    .glass(ContinuousRoundedShape(Tokens.PillHeight / 2), profile = GlassProfile.Button)
                     .padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -177,6 +250,8 @@ private fun GlassPreview(apps: List<AppInfo>, style: GlassStyle, blur: Boolean) 
         }
     }
 }
+
+private val PreviewShape = ContinuousRoundedShape(26.dp)
 
 // endregion
 

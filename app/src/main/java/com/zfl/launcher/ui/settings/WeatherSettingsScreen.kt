@@ -35,10 +35,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.data.WeatherPlace
 import com.zfl.launcher.data.WeatherRepository
-import com.zfl.launcher.ui.theme.Tokens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -82,7 +82,7 @@ fun WeatherSettingsScreen(onBack: () -> Unit) {
                 SettingsRow(onClick = {
                     if (weather.hasLocationPermission()) useCurrentLocation() else askLocation.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
                 }) {
-                    Icon(Icons.Rounded.NearMe, null, tint = SettingsStyle.Link, modifier = Modifier.size(22.dp))
+                    Icon(Icons.Rounded.NearMe, null, tint = LocalAccent.current.primary, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(14.dp))
                     RowTitle(stringResource(R.string.weather_current_location), modifier = Modifier.weight(1f))
                     if (state.place?.current == true) CheckMark()
@@ -109,7 +109,7 @@ fun WeatherSettingsScreen(onBack: () -> Unit) {
                             onValueChange = { query = it },
                             singleLine = true,
                             textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
-                            cursorBrush = SolidColor(Tokens.Accent),
+                            cursorBrush = SolidColor(LocalAccent.current.primary),
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

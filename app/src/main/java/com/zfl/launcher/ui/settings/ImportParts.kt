@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.data.ImportPreview
 import com.zfl.launcher.data.ImportSource
@@ -203,6 +204,6 @@ private fun ConfirmImportDialog(launcherName: String, onConfirm: () -> Unit, onD
 @Composable
 private fun AlertButton(text: String, bold: Boolean, modifier: Modifier, onClick: () -> Unit) {
     Box(modifier.height(48.dp).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        Text(text, color = SettingsStyle.Link, fontSize = 17.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
+        Text(text, color = LocalAccent.current.primary, fontSize = 17.sp, fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
