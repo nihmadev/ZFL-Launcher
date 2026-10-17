@@ -25,10 +25,12 @@ class ContinuousRoundedShape private constructor(
     private val radiusRatio: Float?,
 ) : Shape {
 
-    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
-        val r = radiusDp?.let { with(density) { it.toPx() } } ?: (size.minDimension * radiusRatio!!)
-        return Outline.Generic(continuousRect(size.width, size.height, r))
-    }
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline =
+        Outline.Generic(continuousRect(size.width, size.height, cornerRadius(size, density)))
+
+    /** Corner radius in px for [size], before [continuousRect] limits it to what fits. */
+    fun cornerRadius(size: Size, density: Density): Float =
+        radiusDp?.let { with(density) { it.toPx() } } ?: (size.minDimension * radiusRatio!!)
 
     companion object {
         /** Corner radius as a fraction of the shorter side, e.g. `0.225f` for app icons. */
@@ -45,7 +47,7 @@ const val SQUIRCLE_RADIUS_RATIO: Float = 0.225f
 val SquircleShape: Shape = ContinuousRoundedShape.ratio(SQUIRCLE_RADIUS_RATIO)
 
 /** Largest corner ratio that [continuousRect] can draw; beyond it the curves would overlap. */
-private const val CONTINUOUS_LIMIT_RATIO = 0.5f / 1.528665f
+const val CONTINUOUS_LIMIT_RATIO: Float = 0.5f / ContinuousCorner.EXTENT
 
 /**
  * Outline of an app icon of size [w] x [h] with corners of [cornerRatio] × the shorter side:
@@ -66,28 +68,53 @@ data class IconShape(val cornerRatio: Float) : Shape {
 
 /** Builds a continuous-corner rectangle path of size [w] x [h] with corner [radius] in px. */
 fun continuousRect(w: Float, h: Float, radius: Float): Path {
-    // Coefficients reverse-engineered from UIBezierPath(roundedRect:cornerRadius:).
-    val limit = minOf(w, h) / 2f / 1.528665f
-    val r = minOf(radius, limit)
+    val r = minOf(radius, continuousRadiusLimit(w, h))
     fun x(v: Float) = v * r
+    // Control points of the corner curves, in units of the radius, see [ContinuousCorner].
+    val e = ContinuousCorner.EXTENT
+    val a = ContinuousCorner.A
+    val b = ContinuousCorner.B
+    val c = ContinuousCorner.C
+    val d = ContinuousCorner.D
+    val f = ContinuousCorner.F
+    val g = ContinuousCorner.G
     return Path().apply {
-        moveTo(x(1.528665f), 0f)
-        lineTo(w - x(1.528665f), 0f)
-        cubicTo(w - x(1.08849f), 0f, w - x(0.86840f), 0f, w - x(0.63149f), x(0.07491f))
-        cubicTo(w - x(0.37282f), x(0.16906f), w - x(0.16906f), x(0.37282f), w - x(0.07491f), x(0.63149f))
-        cubicTo(w, x(0.86840f), w, x(1.08849f), w, x(1.528665f))
-        lineTo(w, h - x(1.528665f))
-        cubicTo(w, h - x(1.08849f), w, h - x(0.86840f), w - x(0.07491f), h - x(0.63149f))
-        cubicTo(w - x(0.16906f), h - x(0.37282f), w - x(0.37282f), h - x(0.16906f), w - x(0.63149f), h - x(0.07491f))
-        cubicTo(w - x(0.86840f), h, w - x(1.08849f), h, w - x(1.528665f), h)
-        lineTo(x(1.528665f), h)
-        cubicTo(x(1.08849f), h, x(0.86840f), h, x(0.63149f), h - x(0.07491f))
-        cubicTo(x(0.37282f), h - x(0.16906f), x(0.16906f), h - x(0.37282f), x(0.07491f), h - x(0.63149f))
-        cubicTo(0f, h - x(0.86840f), 0f, h - x(1.08849f), 0f, h - x(1.528665f))
-        lineTo(0f, x(1.528665f))
-        cubicTo(0f, x(1.08849f), 0f, x(0.86840f), x(0.07491f), x(0.63149f))
-        cubicTo(x(0.16906f), x(0.37282f), x(0.37282f), x(0.16906f), x(0.63149f), x(0.07491f))
-        cubicTo(x(0.86840f), 0f, x(1.08849f), 0f, x(1.528665f), 0f)
+        moveTo(x(e), 0f)
+        lineTo(w - x(e), 0f)
+        cubicTo(w - x(a), 0f, w - x(b), 0f, w - x(c), x(d))
+        cubicTo(w - x(f), x(g), w - x(g), x(f), w - x(d), x(c))
+        cubicTo(w, x(b), w, x(a), w, x(e))
+        lineTo(w, h - x(e))
+        cubicTo(w, h - x(a), w, h - x(b), w - x(d), h - x(c))
+        cubicTo(w - x(g), h - x(f), w - x(f), h - x(g), w - x(c), h - x(d))
+        cubicTo(w - x(b), h, w - x(a), h, w - x(e), h)
+        lineTo(x(e), h)
+        cubicTo(x(a), h, x(b), h, x(c), h - x(d))
+        cubicTo(x(f), h - x(g), x(g), h - x(f), x(d), h - x(c))
+        cubicTo(0f, h - x(b), 0f, h - x(a), 0f, h - x(e))
+        lineTo(0f, x(e))
+        cubicTo(0f, x(a), 0f, x(b), x(d), x(c))
+        cubicTo(x(g), x(f), x(f), x(g), x(c), x(d))
+        cubicTo(x(b), 0f, x(a), 0f, x(e), 0f)
         close()
     }
+}
+
+/** Largest corner radius [continuousRect] can draw in a [w] x [h] box; beyond it the curves would overlap. */
+fun continuousRadiusLimit(w: Float, h: Float): Float = minOf(w, h) / 2f / ContinuousCorner.EXTENT
+
+/**
+ * Geometry of one continuous corner, reverse-engineered from UIBezierPath(roundedRect:cornerRadius:).
+ * All values are in units of the corner radius, measured from the corner of the bounding box:
+ * the curve leaves the straight edge [EXTENT] radii away from the corner and is made of
+ * three cubics (the middle one close to a circular arc).
+ */
+object ContinuousCorner {
+    const val EXTENT: Float = 1.528665f
+    const val A: Float = 1.08849f
+    const val B: Float = 0.86840f
+    const val C: Float = 0.63149f
+    const val D: Float = 0.07491f
+    const val F: Float = 0.37282f
+    const val G: Float = 0.16906f
 }
