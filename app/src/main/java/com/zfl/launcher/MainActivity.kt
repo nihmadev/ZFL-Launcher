@@ -36,18 +36,32 @@ import androidx.compose.ui.geometry.Rect
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.settings.AppLanguage
 import com.zfl.launcher.settings.LocalSettingsState
-import com.zfl.launcher.ui.glass.GlassStyle
+import com.zfl.launcher.ui.glass.GlassLight
+import com.zfl.launcher.ui.glass.GlassMode
+import com.zfl.launcher.ui.glass.GlassTiltSensor
+import com.zfl.launcher.ui.glass.LocalGlassLight
 import com.zfl.launcher.ui.glass.LocalGlassSource
+import com.zfl.launcher.ui.glass.glassStyle
+import com.zfl.launcher.ui.glass.isLiquidGlassReady
+import com.zfl.launcher.ui.glass.resolveGlassMode
 import com.zfl.launcher.ui.glass.LocalGlassStyle
 import com.zfl.launcher.ui.home.HomeScreen
 import com.zfl.launcher.ui.home.LauncherActions
 import com.zfl.launcher.ui.icon.IconLoader
 import com.zfl.launcher.ui.icon.LocalIconLoader
+import com.zfl.launcher.ui.theme.AccentColors
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
 
@@ -81,6 +95,10 @@ class MainActivity : ComponentActivity(), LauncherActions {
         vm.refreshWidgets()
     }
 
+    /** Light on Liquid glass, moved by [tiltSensor] while the home screen is started. */
+    private val glassLight = GlassLight()
+    private val tiltSensor by lazy { GlassTiltSensor(this, glassLight) }
+
     private val wallpaperListener = WallpaperManager.OnColorsChangedListener { _: WallpaperColors?, _: Int ->
         vm.refreshWallpaper(force = true)
     }
@@ -112,13 +130,37 @@ class MainActivity : ComponentActivity(), LauncherActions {
                 LocalSettingsState provides settings,
                 LocalGlassSource provides glass.takeIf { settings.blurEffect },
                 LocalIconLoader provides iconLoader,
-                LocalGlassStyle provides GlassStyle(settings.glassTint, settings.glassEdge),
+                LocalGlassStyle provides settings.glassStyle(),
+                LocalGlassLight provides glassLight,
+                LocalAccent provides AccentColors.resolve(settings.dynamicColor, iconLoader.wallpaperColor),
             ) {
                 HomeScreen(vm, actions = this)
             }
         }
         WallpaperManager.getInstance(this)
             .addOnColorsChangedListener(wallpaperListener, Handler(Looper.getMainLooper()))
+        trackTilt()
+    }
+
+    /**
+     * Runs the tilt sensor only while the home screen is started (stopped when another app
+     * covers it or the screen turns off) and Liquid glass with a wallpaper to refract asks for it.
+     */
+    private fun trackTilt() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                try {
+                    combine(vm.settings.state, vm.glass) { settings, source ->
+                        val mode = resolveGlassMode(settings.glassMode, Build.VERSION.SDK_INT, isLiquidGlassReady())
+                        Triple(mode, settings.glassTiltLight, settings.blurEffect && source != null)
+                    }.distinctUntilChanged().collect { (mode, tilt, hasGlass) ->
+                        tiltSensor.update(mode, tilt, visible = hasGlass)
+                    }
+                } finally {
+                    tiltSensor.update(GlassMode.Frosted, tiltEnabled = false, visible = false)
+                }
+            }
+        }
     }
 
     /** True after another activity covered the home screen; used for the resume animation. */

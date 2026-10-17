@@ -405,7 +405,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         wallpaperJob?.cancel()
         wallpaperJob = viewModelScope.launch {
             val background = WallpaperBlur.loadPreview(getApplication())
-            val surfaces = WallpaperBlur.load(getApplication())
+            val surfaces = WallpaperBlur.load(getApplication(), sharp = background)
             _homeWallpaper.value = background
             glass.value = surfaces
         }

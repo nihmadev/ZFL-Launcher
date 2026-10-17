@@ -4,7 +4,6 @@ import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -20,7 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.zfl.launcher.ui.glass.GlassStyle
+import com.zfl.launcher.ui.glass.glassStyle
 import com.zfl.launcher.ui.glass.LocalGlassSource
 import com.zfl.launcher.ui.glass.LocalGlassStyle
 import com.zfl.launcher.ui.glass.WallpaperBlur
@@ -34,6 +33,8 @@ import com.zfl.launcher.ui.settings.SettingsActions
 import com.zfl.launcher.ui.settings.SettingsApp
 import com.zfl.launcher.ui.settings.SettingsRoute
 import com.zfl.launcher.ui.settings.SettingsViewModel
+import com.zfl.launcher.ui.theme.AccentColors
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
 
@@ -84,7 +85,8 @@ class SettingsActivity : ComponentActivity(), SettingsActions {
                 LocalSettingsState provides settings,
                 LocalGlassSource provides glass,
                 LocalIconLoader provides iconLoader,
-                LocalGlassStyle provides GlassStyle(settings.glassTint, settings.glassEdge),
+                LocalGlassStyle provides settings.glassStyle(),
+                LocalAccent provides AccentColors.resolve(settings.dynamicColor, iconLoader.wallpaperColor),
             ) {
                 // First launch: the setup, unless opened on a given screen (e.g. from a widget).
                 Crossfade(settings.onboardingDone || initialRoute != null, label = "onboarding") { setUp ->
@@ -117,17 +119,6 @@ class SettingsActivity : ComponentActivity(), SettingsActions {
         } else {
             requestHomeRole.launch(roleManager.createRequestRoleIntent(RoleManager.ROLE_HOME))
         }
-    }
-
-    override fun openLanguageSettings() {
-        val packageUri = "package:$packageName".toUri()
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ has a per-app language screen; our languages come from locales_config.xml.
-            Intent(Settings.ACTION_APP_LOCALE_SETTINGS, packageUri)
-        } else {
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri)
-        }
-        runCatching { startActivity(intent) }
     }
 
     override fun requestWallpaperAccess() {
