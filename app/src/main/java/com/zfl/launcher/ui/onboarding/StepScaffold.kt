@@ -51,10 +51,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.ui.settings.SettingsStyle
 import com.zfl.launcher.ui.shape.SquircleShape
-import com.zfl.launcher.ui.theme.Tokens
 
 /** Sizes and colors of the setup screens (iOS Setup Assistant proportions). */
 internal object OnboardingStyle {
@@ -177,7 +177,7 @@ internal fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier
             .heightIn(min = OnboardingStyle.ButtonHeight)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
             .clip(CircleShape)
-            .background(Tokens.Accent)
+            .background(LocalAccent.current.primary)
             .drawWithContent {
                 drawContent()
                 if (pressed) drawRect(OnboardingStyle.PressedScrim)
@@ -186,7 +186,7 @@ internal fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier
             .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = Color.White, fontSize = OnboardingStyle.BodySize, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        Text(text, color = LocalAccent.current.onPrimary, fontSize = OnboardingStyle.BodySize, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
     }
 }
 
@@ -204,7 +204,7 @@ internal fun TextLinkButton(text: String, onClick: () -> Unit) {
     ) {
         Text(
             text,
-            color = Tokens.Accent.copy(alpha = if (pressed) 0.4f else 1f),
+            color = LocalAccent.current.primary.copy(alpha = if (pressed) 0.4f else 1f),
             fontSize = OnboardingStyle.BodySize,
             textAlign = TextAlign.Center,
         )
@@ -235,7 +235,7 @@ private fun StepProgressBar(progress: StepProgress?) {
 /** Large accent glyph on top of a step, like the SF Symbols of the iOS setup screens. */
 @Composable
 internal fun StepGlyph(icon: ImageVector) {
-    Icon(icon, contentDescription = null, tint = Tokens.Accent, modifier = Modifier.size(OnboardingStyle.GlyphSize))
+    Icon(icon, contentDescription = null, tint = LocalAccent.current.primary, modifier = Modifier.size(OnboardingStyle.GlyphSize))
 }
 
 /** The app icon artwork (its full-bleed foreground layer) in the squircle of home screen icons. */

@@ -46,6 +46,19 @@ import java.util.Locale
 internal val FLAG_DRAWABLES: Map<String, Int> = mapOf(
     "US" to R.drawable.flag_us,
     "RU" to R.drawable.flag_ru,
+    "PL" to R.drawable.flag_pl,
+    "UA" to R.drawable.flag_ua,
+    "BY" to R.drawable.flag_by,
+    "ES" to R.drawable.flag_es,
+    "FR" to R.drawable.flag_fr,
+    "IT" to R.drawable.flag_it,
+    "DE" to R.drawable.flag_de,
+    "CN" to R.drawable.flag_cn,
+    "JP" to R.drawable.flag_jp,
+    "PT" to R.drawable.flag_pt,
+    "KZ" to R.drawable.flag_kz,
+    "TR" to R.drawable.flag_tr,
+    "RS" to R.drawable.flag_rs,
 )
 
 private val FlagSize = 30.dp
@@ -55,7 +68,12 @@ private val FlagSize = 30.dp
  * takes the new configuration without being recreated, so the text changes in place.
  */
 @Composable
-internal fun LanguageStep(progress: StepProgress?, onSelect: (String?) -> Unit, onContinue: () -> Unit) {
+internal fun LanguageStep(
+    progress: StepProgress?,
+    onSelect: (String?) -> Unit,
+    onContinue: () -> Unit,
+    primaryText: String = stringResource(R.string.onboarding_continue),
+) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val supported = remember { AppLanguage.supported(context) }
@@ -68,7 +86,7 @@ internal fun LanguageStep(progress: StepProgress?, onSelect: (String?) -> Unit, 
     StepScaffold(
         progress = progress,
         title = stringResource(R.string.onboarding_language_title),
-        primaryText = stringResource(R.string.onboarding_continue),
+        primaryText = primaryText,
         onPrimary = onContinue,
         header = { StepGlyph(Icons.Rounded.Language) },
     ) {
@@ -89,7 +107,10 @@ internal fun LanguageStep(progress: StepProgress?, onSelect: (String?) -> Unit, 
 private fun LanguageRow(tag: String, selected: Boolean, onClick: () -> Unit) {
     val locale = remember(tag) { Locale.forLanguageTag(tag) }
     // Each language in itself ("English", "Русский"), so anyone finds theirs.
-    val native = remember(locale) { locale.getDisplayLanguage(locale).replaceFirstChar { it.titlecase(locale) } }
+    val native = remember(locale) {
+        val name = if (locale.script.isEmpty()) locale.getDisplayLanguage(locale) else locale.getDisplayName(locale)
+        name.replaceFirstChar { it.titlecase(locale) }
+    }
     SettingsRow(
         onClick = onClick,
         modifier = Modifier.semantics {
@@ -115,7 +136,7 @@ private fun Flag(tag: String) {
     if (flag != null) {
         Image(painterResource(flag), contentDescription = null, contentScale = ContentScale.Crop, modifier = ring)
     } else {
-        Box(ring.background(SettingsStyle.SwitchOff), contentAlignment = Alignment.Center) {
+        Box(ring.background(SettingsStyle.Tile.Gray.copy(alpha = 0.3f)), contentAlignment = Alignment.Center) {
             Icon(Icons.Rounded.Language, contentDescription = null, tint = SettingsStyle.SecondaryText, modifier = Modifier.size(20.dp))
         }
     }
