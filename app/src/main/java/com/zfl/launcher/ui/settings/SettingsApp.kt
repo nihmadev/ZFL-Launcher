@@ -10,10 +10,15 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.zfl.launcher.data.libraryTitles
 import com.zfl.launcher.R
+import com.zfl.launcher.settings.IconArea
 import com.zfl.launcher.ui.onboarding.LanguageStep
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.IntOffset
@@ -23,9 +28,19 @@ import com.zfl.launcher.ui.theme.Motion
 
 /** Screens of the settings app. */
 enum class SettingsRoute {
-    Main, General, Grid, Transition, Animations, Glass, Icons, HomeScreen, ContextMenu,
+    Main, HomeBehavior, General, Grid, Transition, Animations, Glass, Icons, HomeScreen, ContextMenu,
     HiddenApps, AppIcons, AppNames, License, Import, Weather, FinishSetup, Language,
+    HomeIcons, DockIcons, FolderIcons,
+    AppLibrary, LibraryPinned, LibraryCategories, LibraryCategory,
 }
+
+/** Size settings page of each icon area. */
+private val IconArea.route: SettingsRoute
+    get() = when (this) {
+        IconArea.Home -> SettingsRoute.HomeIcons
+        IconArea.Dock -> SettingsRoute.DockIcons
+        IconArea.Folder -> SettingsRoute.FolderIcons
+    }
 
 /**
  * Root of the settings UI: a simple back stack with iOS "push" transitions.
@@ -38,6 +53,12 @@ fun SettingsApp(vm: SettingsViewModel, actions: SettingsActions, initialRoute: S
     val navigate: (SettingsRoute) -> Unit = { stack = ArrayList(stack + it) }
     val back: () -> Unit = { if (stack.size > 1) stack = ArrayList(stack.dropLast(1)) }
     BackHandler(enabled = stack.size > 1, onBack = back)
+    // Category open in the editor; null while it is a new one, not created yet.
+    var editingCategory by rememberSaveable { mutableStateOf<String?>(null) }
+    // Group names follow the UI language, read from the Activity like the launcher does.
+    val context = LocalContext.current
+    val locale = LocalConfiguration.current.locales[0]
+    LaunchedEffect(locale) { vm.libraryTitles.value = libraryTitles(context) }
 
     AnimatedContent(
         targetState = stack,
@@ -58,7 +79,11 @@ fun SettingsApp(vm: SettingsViewModel, actions: SettingsActions, initialRoute: S
             SettingsRoute.Transition -> TransitionSettingsScreen(vm, back)
             SettingsRoute.Animations -> AnimationSettingsScreen(vm, back)
             SettingsRoute.Glass -> GlassSettingsScreen(vm, actions, back)
-            SettingsRoute.Icons -> IconSettingsScreen(vm, back)
+            SettingsRoute.Icons -> IconSettingsScreen(vm, onOpenArea = { navigate(it.route) }, onBack = back)
+            SettingsRoute.HomeIcons -> AreaIconsScreen(vm, IconArea.Home, back)
+            SettingsRoute.DockIcons -> AreaIconsScreen(vm, IconArea.Dock, back)
+            SettingsRoute.FolderIcons -> AreaIconsScreen(vm, IconArea.Folder, back)
+            SettingsRoute.HomeBehavior -> HomeBehaviorScreen(vm, back)
             SettingsRoute.HomeScreen -> HomeScreenSettingsScreen(vm, back)
             SettingsRoute.ContextMenu -> MenuSettingsScreen(vm, back)
             SettingsRoute.HiddenApps -> AppListScreen(vm, AppListMode.Hidden, back)
@@ -68,6 +93,14 @@ fun SettingsApp(vm: SettingsViewModel, actions: SettingsActions, initialRoute: S
             SettingsRoute.Import -> ImportScreen(vm, back)
             SettingsRoute.Weather -> WeatherSettingsScreen(back)
             SettingsRoute.FinishSetup -> OnboardingFlow(vm, actions, OnboardingMode.FinishSetup, onFinish = back)
+            SettingsRoute.AppLibrary -> LibrarySettingsScreen(vm, navigate, back)
+            SettingsRoute.LibraryPinned -> LibraryPinnedScreen(vm, back)
+            SettingsRoute.LibraryCategories -> LibraryCategoriesScreen(
+                vm,
+                onEdit = { id -> editingCategory = id; navigate(SettingsRoute.LibraryCategory) },
+                onBack = back,
+            )
+            SettingsRoute.LibraryCategory -> CategoryEditorScreen(vm, editingCategory, onCreated = { editingCategory = it }, onBack = back)
         }
     }
 }

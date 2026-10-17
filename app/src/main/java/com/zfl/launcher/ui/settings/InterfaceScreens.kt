@@ -51,7 +51,6 @@ import com.zfl.launcher.R
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.data.DOCK_CAPACITY_OPTIONS
 import com.zfl.launcher.settings.MenuAction
-import com.zfl.launcher.settings.SearchSwipe
 import com.zfl.launcher.settings.SettingsState
 import com.zfl.launcher.ui.glass.GlassStyle
 import com.zfl.launcher.ui.glass.LocalGlassSource
@@ -275,7 +274,6 @@ fun HomeScreenSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
                         dockBackground = Defaults.dockBackground,
                         dockSlots = Defaults.dockSlots,
                         showPagePill = Defaults.showPagePill,
-                        searchSwipe = Defaults.searchSwipe,
                         appLibrary = Defaults.appLibrary,
                     )
                 }
@@ -285,7 +283,8 @@ fun HomeScreenSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
         item {
             val shape = ContinuousRoundedShape(30.dp)
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val preview = remember(apps, settings) { vm.homePreview(apps, settings, settings.gridRows) }
+                val layout by vm.layout.collectAsStateWithLifecycle()
+                val preview = remember(apps, settings, layout) { vm.homePreview(apps, settings) }
                 HomePreview(
                     state = preview,
                     wallpaper = wallpaper,
@@ -322,31 +321,21 @@ fun HomeScreenSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
                 SwitchRow(stringResource(R.string.home_page_pill), settings.showPagePill, onCheckedChange = { value ->
                     vm.settings.update { it.copy(showPagePill = value) }
                 })
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    RowTitle(stringResource(R.string.home_swipe_search))
-                    Spacer(Modifier.height(10.dp))
-                    SegmentedControl(
-                        options = SearchSwipe.entries.map { stringResource(it.labelRes) },
-                        selectedIndex = SearchSwipe.entries.indexOf(settings.searchSwipe),
-                        onSelect = { index -> vm.settings.update { it.copy(searchSwipe = SearchSwipe.entries[index]) } },
-                    )
-                }
                 SwitchRow(stringResource(R.string.home_app_library), settings.appLibrary, onCheckedChange = { value ->
                     vm.settings.update { it.copy(appLibrary = value) }
                 })
+            }
+        }
+        item { SectionHeader(stringResource(R.string.home_section_layout)) }
+        item {
+            SettingsCard {
+                SwitchRow(stringResource(R.string.layout_lock), settings.layoutLocked, vm.settings::setLayoutLocked)
             }
         }
     }
 }
 
 // endregion
-
-private val SearchSwipe.labelRes: Int
-    get() = when (this) {
-        SearchSwipe.Disabled -> R.string.home_swipe_disabled
-        SearchSwipe.Down -> R.string.home_swipe_down
-        SearchSwipe.Up -> R.string.home_swipe_up
-    }
 
 // region Context menu
 
@@ -400,6 +389,8 @@ private val MenuAction.labelRes: Int
         MenuAction.HideApp -> R.string.menu_hide_app
         MenuAction.EditHome -> R.string.menu_edit_home
         MenuAction.RemoveApp -> R.string.menu_remove_app
+        MenuAction.LibraryPin -> R.string.menu_library_pin
+        MenuAction.LibraryCategory -> R.string.menu_library_category_setting
     }
 
 // endregion

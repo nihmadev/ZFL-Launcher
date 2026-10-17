@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.SystemUpdateAlt
 import androidx.compose.material.icons.rounded.WbSunny
 import androidx.compose.material.icons.rounded.Translate
 import androidx.compose.material.icons.rounded.ViewCarousel
+import androidx.compose.material.icons.rounded.ViewModule
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -51,6 +52,7 @@ import com.zfl.launcher.ui.theme.Tokens
 @Composable
 fun MainSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, navigate: (SettingsRoute) -> Unit) {
     val settings by vm.settings.state.collectAsStateWithLifecycle()
+    val layout by vm.layout.collectAsStateWithLifecycle()
     val locale = LocalConfiguration.current.locales[0]
 
     val unfinished = finishSetupItems(actions.setupState(hasImportSources = null)).size
@@ -76,7 +78,7 @@ fun MainSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, navigate
                     Icons.Rounded.GridView,
                     stringResource(R.string.row_grid),
                     onClick = { navigate(SettingsRoute.Grid) },
-                    value = "4×${settings.gridRows}",
+                    value = (layout?.grid ?: vm.savedGrid()).toString(),
                     tileColor = SettingsStyle.Tile.Indigo,
                 )
                 NavRow(
@@ -112,6 +114,13 @@ fun MainSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, navigate
                     onClick = { navigate(SettingsRoute.HomeScreen) },
                     tileColor = SettingsStyle.Tile.Purple,
                 )
+                NavRow(
+                    Icons.Rounded.ViewModule,
+                    stringResource(R.string.library_title),
+                    onClick = { navigate(SettingsRoute.AppLibrary) },
+                    tileColor = SettingsStyle.Tile.Indigo,
+                )
+                NavRow(Icons.Rounded.Apps, stringResource(R.string.gestures_home), onClick = { navigate(SettingsRoute.HomeBehavior) })
                 NavRow(Icons.AutoMirrored.Rounded.ViewList, stringResource(R.string.row_context_menu), onClick = { navigate(SettingsRoute.ContextMenu) })
             }
         }

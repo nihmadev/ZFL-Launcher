@@ -80,6 +80,66 @@ Five ways to move between your home screen pages, recorded on the same phone.
 
 [Watch the 60 fps videos](etc/README.md#page-transitions) for smoother playback.
 
+## Gestures and Home
+
+Open **Settings → Gestures and Home**. Swipe up, swipe down, double tap on empty
+space and pressing Home again each have a saved assignment. Choose no action,
+Search, App Library, an installed app (activity and profile), or Settings. Repeat
+Home also offers **Main home page**. App Library is offered only while its page
+is enabled; disabling the page later preserves its assignment and shows it as
+unavailable. It does not enable itself again.
+
+| Setting | Default |
+| --- | --- |
+| Swipe down | Search |
+| Swipe up / empty-space double tap | No action |
+| Repeat Home | Main home page |
+| Return from a launched app | Keep the current page |
+| Main home page | First home page |
+| Today / launcher haptics | Enabled |
+
+Reset on this settings screen restores these defaults. Existing search direction
+settings migrate once: Down assigns Search only to swipe down, Up only to swipe
+up, Disabled to neither. The older swipe-down boolean is honored when no valid
+direction was saved. New assignment keys win, including unknown values (which
+safely behave as No action). Legacy keys are removed after migration.
+
+Home closes the top menu, dialog, editor, search, folder or edit mode before any
+Repeat Home action can run. A separate Home press on the exposed desktop runs the
+assignment once. **No action** leaves the page as it is. Return navigation and the
+existing return animation are separate from Repeat Home: returning from a launched
+app follows the chosen return policy; Settings and permission-screen resumes do
+not become repeat presses. A background HOME Intent also follows the return policy.
+
+The main page is a home-page ordinal, independent of Today and the library. If that
+page disappears, its ordinal is clamped to the nearest existing home page (or the
+first if none remain). This does not reorder apps or save the layout while paging.
+Hiding Today removes its UI from the pager while preserving its saved widgets,
+photos and hosted widget IDs, including stack contents. Re-enabling it restores
+them. Disabling a page while viewing it selects the main home page.
+
+| Input priority | Owner |
+| --- | --- |
+| Open overlay/editor, active drag, edit mode | Existing local interaction; global assignments disabled |
+| Horizontal axis after touch slop | Home pager |
+| Vertical gesture on scrollable hosted content | The widget |
+| Other vertical gesture on a Smart Stack, including its edges | The stack |
+| Remaining vertical page gesture | Assigned swipe |
+| Double tap outside all occupied grid spans | Empty-space assignment |
+
+The swipe region remains the home page, including icons where the child does not
+consume the drag. An axis locks after system touch slop. After crossing the existing
+swipe threshold, an action runs once on release; consumed sequences, extra fingers,
+cancellation, focus loss and removal of the handler invalidate it. An ordinary app
+tap does not wait for a double-tap timeout.
+
+App targets retain the exact component and profile, never a label or arbitrary
+Intent URI. Missing apps and unavailable profiles do nothing; the assignment stays
+visible and can be replaced or reset. Targets are checked again by LauncherApps
+before launch. Haptics controls ZFL's lift, tick, threshold and switch feedback,
+including the long press created by its widget host; platform haptic preferences
+still apply. It does not control vibration inside another app or widget.
+
 ## Privacy comes with it
 
 No advertising SDKs, trackers, analytics, crash reporters, Firebase, or Google Play
