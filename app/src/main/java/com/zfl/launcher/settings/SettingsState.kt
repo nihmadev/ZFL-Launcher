@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.zfl.launcher.data.DEFAULT_DOCK_CAPACITY
 import com.zfl.launcher.data.DOCK_CAPACITY_OPTIONS
+import com.zfl.launcher.data.LibraryConfig
 import com.zfl.launcher.ui.glass.GlassMode
 import com.zfl.launcher.ui.icon.DEFAULT_ICON_TINT
 import com.zfl.launcher.ui.icon.IconAppearance
@@ -13,7 +14,13 @@ import com.zfl.launcher.ui.theme.Tokens
 enum class PageTransition { Default, Rotation, Flip, ZoomIn, Alpha }
 
 /** Items of the long-press menu that the user can turn off. */
-enum class MenuAction { Shortcuts, RenameFolder, AddToHome, AppInfo, Dock, HideApp, EditHome, RemoveApp }
+enum class MenuAction {
+    Shortcuts, RenameFolder, AddToHome, AppInfo, Dock, HideApp, EditHome, RemoveApp,
+    /** App Library only: pin or unpin the app at the top of the library. */
+    LibraryPin,
+    /** App Library only: choose the app's category. */
+    LibraryCategory,
+}
 
 /** Every user-configurable option of the launcher. Defaults match a fresh install. */
 data class SettingsState(
@@ -25,8 +32,11 @@ data class SettingsState(
     val customTextSize: Boolean = false,
     /** Icon label size multiplier, see [MIN_TEXT_SCALE]..[MAX_TEXT_SCALE]. */
     val textScale: Float = 1f,
-    /** Rows of icons per home screen page (the grid is always 4 columns wide). */
-    val gridRows: Int = 6,
+    /** Space around the home grid; the grid size itself is saved with the layout (see LayoutData.grid). */
+    val gridMargins: GridMargins = GridMargins.Default,
+    val gridAlignment: GridAlignment = GridAlignment.Top,
+    /** Turns off moving, adding and removing things on the Home Screen; apps still open and pages still swipe. */
+    val layoutLocked: Boolean = false,
     val pageTransition: PageTransition = PageTransition.Default,
     /** Scale animation when an app is launched from its icon. */
     val openCloseAnimation: Boolean = true,
@@ -56,6 +66,10 @@ data class SettingsState(
     val iconCorner: Float = DEFAULT_ICON_CORNER,
     /** Labels under home screen and folder icons. */
     val showLabels: Boolean = true,
+    /** Own icon and label sizes of the home pages, the dock and folders; inherited by default. */
+    val homeStyle: AreaStyle = AreaStyle.Inherit,
+    val dockStyle: AreaStyle = AreaStyle.Inherit,
+    val folderStyle: AreaStyle = AreaStyle.Inherit,
     /** Default, Dark, Tinted or Auto (Default/Dark following the system theme). */
     val iconAppearance: IconAppearance = IconAppearance.Default,
     /** Tinted icons take their hue from the wallpaper instead of [iconTintColor]. */
@@ -76,10 +90,12 @@ data class SettingsState(
     val dockBackground: Boolean = true,
     /** The "Search" / page dots pill above the dock. */
     val showPagePill: Boolean = true,
-    /** Gesture used to open app search on a home screen page. */
-    val searchSwipe: SearchSwipe = SearchSwipe.Down,
-    /** The App Library page after the last home screen page. */
+    /** Saved gesture commands, Home navigation and launcher feedback. */
+    val homeBehavior: HomeBehavior = HomeBehavior(),
+    /** The optional App Library page; disabling it preserves its configuration. */
     val appLibrary: Boolean = true,
+    /** View, categories, pins and new-app placement of the App Library. */
+    val library: LibraryConfig = LibraryConfig(),
     /** Long-press menu items the user turned off. */
     val hiddenMenuActions: Set<MenuAction> = emptySet(),
 
@@ -99,23 +115,58 @@ data class SettingsState(
     /** The label multiplier that should actually be used. */
     val labelScale: Float get() = if (customTextSize) textScale else 1f
 
-    /** Size of app and folder icons on the home screen, in the dock and in folders. */
+    /** General icon size; the home pages, the dock and folders may override it ([look]). */
     val iconSize: Dp get() = Tokens.IconSize * iconScale
 
-    /** Dock height: grows and shrinks with the icons so their margins stay the same. */
-    val dockHeight: Dp get() = Tokens.DockHeight + (iconSize - Tokens.IconSize)
+    fun style(area: IconArea): AreaStyle = when (area) {
+        IconArea.Home -> homeStyle
+        IconArea.Dock -> dockStyle
+        IconArea.Folder -> folderStyle
+    }
+
+    fun withStyle(area: IconArea, style: AreaStyle): SettingsState = when (area) {
+        IconArea.Home -> copy(homeStyle = style)
+        IconArea.Dock -> copy(dockStyle = style)
+        IconArea.Folder -> copy(folderStyle = style)
+    }
+
+    /** What [area] draws: its own values, the general ones otherwise. The dock shows no names unless asked to. */
+    fun look(area: IconArea): AreaLook {
+        val style = style(area)
+        return AreaLook(
+            iconScale = style.iconScale ?: iconScale,
+            labelScale = style.labelScale ?: labelScale,
+            showLabels = style.showLabels ?: (area != IconArea.Dock && showLabels),
+        )
+    }
+
+    /**
+     * Dock height: grows and shrinks with the dock icons so their margins stay the same, and
+     * makes room for [dockLabelBlock] (gap and one line of text) when the dock shows names.
+     */
+    fun dockHeight(dockLabelBlock: Dp): Dp {
+        val dock = look(IconArea.Dock)
+        return Tokens.DockHeight + (dock.iconSize - Tokens.IconSize) + if (dock.showLabels) dockLabelBlock else 0.dp
+    }
 
     /** Space under the home grid taken by the page pill and the dock. */
-    val bottomBarHeight: Dp
-        get() = (if (showPagePill) Tokens.PillHeight + PILL_MARGIN * 2 else 0.dp) +
-            (if (showDock) dockHeight + Tokens.DockBottomMargin else 0.dp)
+    fun bottomBarHeight(dockLabelBlock: Dp): Dp =
+        (if (showPagePill) Tokens.PillHeight + PILL_MARGIN * 2 else 0.dp) +
+            (if (showDock) dockHeight(dockLabelBlock) + Tokens.DockBottomMargin else 0.dp)
 
     fun isMenuActionEnabled(action: MenuAction): Boolean = action !in hiddenMenuActions
+
+    /** Search can be opened from a home page: the swipe or the "Search" pill. */
+    val hasHomeSearch: Boolean get() = homeBehavior.swipeUp == HomeAction.Search || homeBehavior.swipeDown == HomeAction.Search ||
+        homeBehavior.emptyDoubleTap == HomeAction.Search || homeBehavior.repeatHome == HomeAction.Search || showPagePill
 
     /** Brings every numeric value back into its allowed range. */
     fun sanitized(): SettingsState = copy(
         textScale = textScale.coerceIn(MIN_TEXT_SCALE, MAX_TEXT_SCALE),
-        gridRows = gridRows.coerceIn(GRID_ROW_OPTIONS.first(), GRID_ROW_OPTIONS.last()),
+        gridMargins = gridMargins.sanitized(),
+        homeStyle = homeStyle.sanitized(),
+        dockStyle = dockStyle.sanitized(),
+        folderStyle = folderStyle.sanitized(),
         glassTint = glassTint.coerceIn(0f, MAX_GLASS_TINT),
         glassRefraction = if (glassRefraction.isNaN()) DEFAULT_GLASS_REFRACTION else glassRefraction.coerceIn(0f, 1f),
         homeBlurRadius = homeBlurRadius.coerceIn(MIN_HOME_BLUR, MAX_HOME_BLUR),
@@ -125,12 +176,12 @@ data class SettingsState(
         iconTintColor = iconTintColor or OPAQUE,
         iconTintSaturation = if (iconTintSaturation.isNaN()) DEFAULT_TINT_SATURATION else iconTintSaturation.coerceIn(0f, 1f),
         dockSlots = dockSlots.coerceIn(DOCK_CAPACITY_OPTIONS.first(), DOCK_CAPACITY_OPTIONS.last()),
+        homeBehavior = homeBehavior.sanitized(),
     )
 
     companion object {
         const val MIN_TEXT_SCALE = 0.7f
         const val MAX_TEXT_SCALE = 1.3f
-        val GRID_ROW_OPTIONS: List<Int> = listOf(5, 6, 7)
 
         const val DEFAULT_GLASS_TINT = 0.12f
         const val MAX_GLASS_TINT = 0.5f

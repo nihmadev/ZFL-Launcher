@@ -2,8 +2,13 @@ package com.zfl.launcher.settings
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.zfl.launcher.data.LayoutStore
+import com.zfl.launcher.data.LibraryConfig
+import com.zfl.launcher.data.libraryConfigFromJson
+import com.zfl.launcher.data.toJson
+import com.zfl.launcher.data.withOrphansCapped
 import com.zfl.launcher.ui.glass.GlassMode
 import com.zfl.launcher.ui.icon.IconAppearance
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,10 +27,11 @@ private val Defaults: SettingsState = SettingsState()
  */
 class LauncherSettings private constructor(context: Context) {
     private val appContext: Context = context.applicationContext
-    private val prefs: SharedPreferences = appContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     init {
         migrateOnboarding()
+        prefs.migrateHomeBehavior()
     }
 
     private val _state = MutableStateFlow(read())
@@ -50,7 +56,11 @@ class LauncherSettings private constructor(context: Context) {
             putBoolean(KEY_BLUR, next.blurEffect)
             putBoolean(KEY_CUSTOM_TEXT, next.customTextSize)
             putFloat(KEY_TEXT_SCALE, next.textScale)
-            putInt(KEY_GRID_ROWS, next.gridRows)
+            putFloat(KEY_GRID_SIDE, next.gridMargins.side.value)
+            putFloat(KEY_GRID_TOP, next.gridMargins.top.value)
+            putFloat(KEY_GRID_BOTTOM, next.gridMargins.bottom.value)
+            putString(KEY_GRID_ALIGNMENT, next.gridAlignment.name)
+            putBoolean(KEY_LAYOUT_LOCKED, next.layoutLocked)
             putString(KEY_TRANSITION, next.pageTransition.name)
             putBoolean(KEY_OPEN_ANIM, next.openCloseAnimation)
             putBoolean(KEY_RESUME_ANIM, next.resumeAnimation)
@@ -65,6 +75,7 @@ class LauncherSettings private constructor(context: Context) {
             putFloat(KEY_ICON_SCALE, next.iconScale)
             putFloat(KEY_ICON_CORNER, next.iconCorner)
             putBoolean(KEY_SHOW_LABELS, next.showLabels)
+            IconArea.entries.forEach { putAreaStyle(it, next.style(it)) }
             putString(KEY_ICON_APPEARANCE, next.iconAppearance.name)
             putBoolean(KEY_ICON_TINT_WALLPAPER, next.iconTintFromWallpaper)
             putInt(KEY_ICON_TINT_COLOR, next.iconTintColor)
@@ -75,8 +86,9 @@ class LauncherSettings private constructor(context: Context) {
             putInt(KEY_DOCK_SLOTS, next.dockSlots)
             putBoolean(KEY_DOCK_BACKGROUND, next.dockBackground)
             putBoolean(KEY_SHOW_PILL, next.showPagePill)
-            putString(KEY_SEARCH_SWIPE, next.searchSwipe.name)
+            putHomeBehavior(next.homeBehavior)
             putBoolean(KEY_APP_LIBRARY, next.appLibrary)
+            putString(KEY_LIBRARY, next.library.toJson())
             putStringSet(KEY_HIDDEN_MENU, next.hiddenMenuActions.map { it.name }.toSet())
             putBoolean(KEY_DYNAMIC_COLOR, next.dynamicColor)
             putBoolean(KEY_ONBOARDING_DONE, next.onboardingDone)
@@ -107,11 +119,22 @@ class LauncherSettings private constructor(context: Context) {
     fun setResumeAnimation(value: Boolean): Unit = update { it.copy(resumeAnimation = value) }
     fun setPageTransition(value: PageTransition): Unit = update { it.copy(pageTransition = value) }
     fun setTextScale(value: Float): Unit = update { it.copy(textScale = value) }
-    fun setGridRows(value: Int): Unit = update { it.copy(gridRows = value) }
+    fun setLayoutLocked(value: Boolean): Unit = update { it.copy(layoutLocked = value) }
     fun setDynamicColor(value: Boolean): Unit = update { it.copy(dynamicColor = value) }
 
     fun setMenuActionEnabled(action: MenuAction, enabled: Boolean): Unit = update {
         it.copy(hiddenMenuActions = if (enabled) it.hiddenMenuActions - action else it.hiddenMenuActions + action)
+    }
+
+    /**
+     * Applies an App Library change ([com.zfl.launcher.data.LibraryConfig] operations): one
+     * write and one emission, nothing when it changes nothing. Assignments and pins of missing
+     * apps beyond the limit are forgotten here ([withOrphansCapped]), never those of [keepUsers].
+     */
+    fun updateLibrary(present: Set<String>, keepUsers: Set<String>, transform: (LibraryConfig) -> LibraryConfig) {
+        val current = _state.value.library
+        val next = transform(current).withOrphansCapped(present, keepUsers)
+        if (next != current) write { putString(KEY_LIBRARY, next.toJson()) }
     }
 
     fun setAppHidden(appKey: String, hidden: Boolean) {
@@ -149,7 +172,15 @@ class LauncherSettings private constructor(context: Context) {
         blurEffect = prefs.getBoolean(KEY_BLUR, true),
         customTextSize = prefs.getBoolean(KEY_CUSTOM_TEXT, false),
         textScale = prefs.getFloat(KEY_TEXT_SCALE, 1f),
-        gridRows = prefs.getInt(KEY_GRID_ROWS, 6),
+        gridMargins = GridMargins(
+            side = prefs.getFloat(KEY_GRID_SIDE, Defaults.gridMargins.side.value).dp,
+            top = prefs.getFloat(KEY_GRID_TOP, Defaults.gridMargins.top.value).dp,
+            bottom = prefs.getFloat(KEY_GRID_BOTTOM, Defaults.gridMargins.bottom.value).dp,
+        ),
+        gridAlignment = prefs.getString(KEY_GRID_ALIGNMENT, null)
+            ?.let { name -> GridAlignment.entries.firstOrNull { it.name == name } }
+            ?: Defaults.gridAlignment,
+        layoutLocked = prefs.getBoolean(KEY_LAYOUT_LOCKED, Defaults.layoutLocked),
         pageTransition = prefs.getString(KEY_TRANSITION, null)
             ?.let { name -> PageTransition.entries.firstOrNull { it.name == name } }
             ?: PageTransition.Default,
@@ -166,6 +197,9 @@ class LauncherSettings private constructor(context: Context) {
         iconScale = prefs.getFloat(KEY_ICON_SCALE, Defaults.iconScale),
         iconCorner = prefs.getFloat(KEY_ICON_CORNER, Defaults.iconCorner),
         showLabels = prefs.getBoolean(KEY_SHOW_LABELS, Defaults.showLabels),
+        homeStyle = readAreaStyle(IconArea.Home),
+        dockStyle = readAreaStyle(IconArea.Dock),
+        folderStyle = readAreaStyle(IconArea.Folder),
         iconAppearance = IconAppearance.fromStored(prefs.getString(KEY_ICON_APPEARANCE, null)),
         iconTintFromWallpaper = prefs.getBoolean(KEY_ICON_TINT_WALLPAPER, Defaults.iconTintFromWallpaper),
         iconTintColor = prefs.getInt(KEY_ICON_TINT_COLOR, Defaults.iconTintColor),
@@ -176,11 +210,9 @@ class LauncherSettings private constructor(context: Context) {
         dockSlots = prefs.getInt(KEY_DOCK_SLOTS, Defaults.dockSlots),
         dockBackground = prefs.getBoolean(KEY_DOCK_BACKGROUND, Defaults.dockBackground),
         showPagePill = prefs.getBoolean(KEY_SHOW_PILL, Defaults.showPagePill),
-        searchSwipe = SearchSwipe.fromStored(
-            prefs.getString(KEY_SEARCH_SWIPE, null),
-            legacyEnabled = prefs.getBoolean(KEY_SWIPE_SEARCH, true),
-        ),
+        homeBehavior = prefs.readHomeBehavior(),
         appLibrary = prefs.getBoolean(KEY_APP_LIBRARY, Defaults.appLibrary),
+        library = libraryConfigFromJson(prefs.getString(KEY_LIBRARY, null)),
         hiddenMenuActions = prefs.getStringSet(KEY_HIDDEN_MENU, emptySet()).orEmpty()
             .mapNotNull { name -> MenuAction.entries.firstOrNull { it.name == name } }.toSet(),
         hiddenApps = prefs.getStringSet(KEY_HIDDEN, emptySet()).orEmpty().toSet(),
@@ -189,6 +221,25 @@ class LauncherSettings private constructor(context: Context) {
         dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, Defaults.dynamicColor),
         onboardingDone = prefs.getBoolean(KEY_ONBOARDING_DONE, Defaults.onboardingDone),
     )
+
+    /** An inherited value is stored as a missing key. */
+    private fun SharedPreferences.Editor.putAreaStyle(area: IconArea, style: AreaStyle) {
+        val key = area.keyPrefix
+        style.iconScale?.let { putFloat("${key}_icon_scale", it) } ?: remove("${key}_icon_scale")
+        style.labelScale?.let { putFloat("${key}_label_scale", it) } ?: remove("${key}_label_scale")
+        style.showLabels?.let { putBoolean("${key}_labels", it) } ?: remove("${key}_labels")
+    }
+
+    private fun readAreaStyle(area: IconArea): AreaStyle {
+        val key = area.keyPrefix
+        return AreaStyle(
+            iconScale = "${key}_icon_scale".takeIf(prefs::contains)?.let { prefs.getFloat(it, 1f) },
+            labelScale = "${key}_label_scale".takeIf(prefs::contains)?.let { prefs.getFloat(it, 1f) },
+            showLabels = "${key}_labels".takeIf(prefs::contains)?.let { prefs.getBoolean(it, true) },
+        )
+    }
+
+    private val IconArea.keyPrefix: String get() = "area_${name.lowercase()}"
 
     private fun <T> readJsonMap(prefKey: String, value: (JSONObject, String) -> T): Map<String, T> {
         val json = prefs.getString(prefKey, null) ?: return emptyMap()
@@ -203,7 +254,13 @@ class LauncherSettings private constructor(context: Context) {
         private const val KEY_BLUR = "blur_effect"
         private const val KEY_CUSTOM_TEXT = "custom_text_size"
         private const val KEY_TEXT_SCALE = "text_scale"
-        private const val KEY_GRID_ROWS = "grid_rows"
+        /** Rows of the four-column grid before the grid was saved with the layout; only read to migrate it. */
+        private const val KEY_LEGACY_GRID_ROWS = "grid_rows"
+        private const val KEY_GRID_SIDE = "grid_margin_side"
+        private const val KEY_GRID_TOP = "grid_margin_top"
+        private const val KEY_GRID_BOTTOM = "grid_margin_bottom"
+        private const val KEY_GRID_ALIGNMENT = "grid_alignment"
+        private const val KEY_LAYOUT_LOCKED = "layout_locked"
         private const val KEY_TRANSITION = "page_transition"
         private const val KEY_OPEN_ANIM = "open_close_animation"
         private const val KEY_RESUME_ANIM = "resume_animation"
@@ -231,15 +288,25 @@ class LauncherSettings private constructor(context: Context) {
         private const val KEY_DOCK_SLOTS = "dock_slots"
         private const val KEY_DOCK_BACKGROUND = "dock_background"
         private const val KEY_SHOW_PILL = "show_page_pill"
-        private const val KEY_SWIPE_SEARCH = "swipe_down_search"
-        private const val KEY_SEARCH_SWIPE = "search_swipe"
         private const val KEY_APP_LIBRARY = "app_library"
+        private const val KEY_LIBRARY = "app_library_config"
         private const val KEY_HIDDEN_MENU = "hidden_menu_actions"
         private const val KEY_ONBOARDING_DONE = "onboarding_done"
         private const val KEY_DYNAMIC_COLOR = "dynamic_color"
 
         @Volatile
         private var instance: LauncherSettings? = null
+
+        /**
+         * Grid rows saved by versions that kept them in the settings, null when never chosen.
+         * The layout file stores its grid since then, so this is read only for older layouts.
+         */
+        fun legacyGridRows(context: Context): Int? {
+            val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            return if (prefs.contains(KEY_LEGACY_GRID_ROWS)) prefs.getInt(KEY_LEGACY_GRID_ROWS, 0) else null
+        }
+
+        private const val PREFS_NAME = "settings"
 
         fun get(context: Context): LauncherSettings =
             instance ?: synchronized(this) { instance ?: LauncherSettings(context).also { instance = it } }

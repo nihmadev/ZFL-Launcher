@@ -1,6 +1,7 @@
 package com.zfl.launcher.settings
 
 import com.zfl.launcher.ui.theme.Tokens
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -9,7 +10,6 @@ class SettingsStateTest {
     fun sanitizedClampsOutOfRangeValues() {
         val state = SettingsState(
             textScale = 9f,
-            gridRows = 2,
             glassTint = -1f,
             homeBlurRadius = 500f,
             menuDim = 2f,
@@ -17,7 +17,6 @@ class SettingsStateTest {
             iconCorner = 3f,
         ).sanitized()
         assertEquals(SettingsState.MAX_TEXT_SCALE, state.textScale)
-        assertEquals(SettingsState.GRID_ROW_OPTIONS.first(), state.gridRows)
         assertEquals(0f, state.glassTint)
         assertEquals(SettingsState.MAX_HOME_BLUR, state.homeBlurRadius)
         assertEquals(SettingsState.MAX_MENU_DIM, state.menuDim)
@@ -42,14 +41,14 @@ class SettingsStateTest {
         val full = SettingsState()
         assertEquals(
             Tokens.PillHeight + SettingsState.PILL_MARGIN * 2 + Tokens.DockHeight + Tokens.DockBottomMargin,
-            full.bottomBarHeight,
+            full.bottomBarHeight(0.dp),
         )
-        assertEquals(0f, full.copy(showDock = false, showPagePill = false).bottomBarHeight.value)
+        assertEquals(0f, full.copy(showDock = false, showPagePill = false).bottomBarHeight(0.dp).value)
     }
 
     @Test
     fun dockGrowsWithIcons() {
         val big = SettingsState(iconScale = 1.2f)
-        assertEquals((Tokens.DockHeight + Tokens.IconSize * 0.2f).value, big.dockHeight.value, 0.01f)
+        assertEquals((Tokens.DockHeight + Tokens.IconSize * 0.2f).value, big.dockHeight(0.dp).value, 0.01f)
     }
 }
