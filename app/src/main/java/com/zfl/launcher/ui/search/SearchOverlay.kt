@@ -12,7 +12,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -26,9 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -44,7 +40,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,8 +69,12 @@ import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
-import kotlinx.coroutines.launch
+import java.text.Collator
 import java.util.Locale
+import com.zfl.launcher.data.letterSections
+import com.zfl.launcher.ui.library.AppListRow
+import com.zfl.launcher.ui.library.LetterIndexedList
+import com.zfl.launcher.ui.library.LibraryCallbacks
 import com.zfl.launcher.ui.theme.Motion
 
 /** What search reports back. */
@@ -233,14 +232,9 @@ private fun ResultsCard(query: String, results: List<AppInfo>, callbacks: Search
 
 @Composable
 private fun LibrarySearch(query: String, onQueryChange: (String) -> Unit, results: List<AppInfo>, callbacks: SearchCallbacks) {
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     // A–Z sections; digits and symbols go under "#".
-    val sections = remember(results) { results.groupBy { sectionOf(it.label) } }
-    val sectionStart = remember(sections) {
-        var index = 0
-        sections.mapValues { (_, apps) -> index.also { index += 1 + apps.size } }
-    }
+    val sections = remember(results) { letterSections(results) { it.label } }
+    val rows = remember(callbacks) { callbacks.asLibraryCallbacks() }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             SearchField(
@@ -259,37 +253,7 @@ private fun LibrarySearch(query: String, onQueryChange: (String) -> Unit, result
                     .padding(horizontal = 12.dp, vertical = 10.dp),
             )
         }
-        Box(Modifier.weight(1f).consumeTaps()) {
-            LazyColumn(state = listState, contentPadding = PaddingValues(start = 16.dp, end = 32.dp, top = 8.dp, bottom = 16.dp)) {
-                sections.forEach { (letter, apps) ->
-                    item(key = "header-$letter") {
-                        Text(letter, color = Tokens.TextPrimary, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp, top = 12.dp, bottom = 4.dp))
-                    }
-                    items(apps, key = { it.key }) { app -> ResultRow(app, callbacks) }
-                }
-            }
-            // Letter index on the right edge: tap a letter to jump to its section.
-            Column(
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                sections.keys.forEach { letter ->
-                    Text(
-                        letter,
-                        color = LocalAccent.current.primary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .clickable(interactionSource = null, indication = null) {
-                                scope.launch { listState.scrollToItem(sectionStart.getValue(letter)) }
-                            }
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
-                    )
-                }
-            }
-        }
+        LetterIndexedList(sections, rows, Modifier.weight(1f).consumeTaps())
     }
 }
 
@@ -352,23 +316,13 @@ private fun SearchField(
 
 @Composable
 private fun ResultRow(app: AppInfo, callbacks: SearchCallbacks) {
-    var bounds by remember { mutableStateOf(Rect.Zero) }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .pointerInput(app.key) {
-                detectTapGestures(
-                    onTap = { callbacks.onLaunch(app, bounds) },
-                    onLongPress = { callbacks.onLongPress(app, bounds) },
-                )
-            }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppIconImage(app, size = 44.dp, modifier = Modifier.onGloballyPositioned { bounds = it.boundsInWindow() })
-        Spacer(Modifier.width(16.dp))
-        Text(app.label, color = Tokens.TextPrimary, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
+    AppListRow(app, remember(callbacks) { callbacks.asLibraryCallbacks() })
+}
+
+/** Search rows are the App Library's list rows. */
+private fun SearchCallbacks.asLibraryCallbacks(): LibraryCallbacks = object : LibraryCallbacks {
+    override fun onLaunch(app: AppInfo, bounds: Rect) = this@asLibraryCallbacks.onLaunch(app, bounds)
+    override fun onLongPress(app: AppInfo, bounds: Rect) = this@asLibraryCallbacks.onLongPress(app, bounds)
 }
 
 @Composable
@@ -403,7 +357,8 @@ private fun submit(query: String, results: List<AppInfo>, callbacks: SearchCallb
  * then it appears anywhere. An empty query returns every app A–Z.
  */
 internal fun search(apps: List<AppInfo>, query: String): List<AppInfo> {
-    val sorted = apps.sortedBy { it.label.lowercase(Locale.getDefault()) }
+    val collator = Collator.getInstance()
+    val sorted = apps.sortedWith(compareBy<AppInfo, String>(collator) { it.label }.thenBy { it.key })
     val q = query.trim().lowercase(Locale.getDefault())
     if (q.isEmpty()) return sorted
     return sorted
@@ -434,11 +389,6 @@ private val CyrillicToLatin: Map<Char, String> = mapOf(
 /** Lower-case Cyrillic → Latin, other characters unchanged. */
 private fun transliterate(text: String): String = buildString {
     text.forEach { c -> append(CyrillicToLatin[c] ?: c.toString()) }
-}
-
-private fun sectionOf(label: String): String {
-    val first = label.trim().firstOrNull()?.uppercaseChar() ?: return "#"
-    return if (first.isLetter()) first.toString() else "#"
 }
 
 private const val SUGGESTIONS_ROW = 4

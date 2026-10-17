@@ -1,40 +1,27 @@
 package com.zfl.launcher.ui.library
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.layout.LazyLayoutCacheWindow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.List
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Dashboard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,28 +33,26 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.layout.onPlaced
+import com.zfl.launcher.ui.theme.launcherHaptics
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zfl.launcher.R
 import com.zfl.launcher.data.AppInfo
-import com.zfl.launcher.data.LibraryCategory
+import com.zfl.launcher.data.AppLibraryState
+import com.zfl.launcher.data.LibraryView
 import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
-import com.zfl.launcher.ui.shape.ContinuousRoundedShape
-import com.zfl.launcher.ui.theme.Tokens
-import com.zfl.launcher.ui.theme.Motion
 import com.zfl.launcher.ui.theme.Haptics
+import com.zfl.launcher.ui.theme.Tokens
 
 /** What App Library icons report back. Bounds are in window coordinates. */
 interface LibraryCallbacks {
@@ -75,122 +60,117 @@ interface LibraryCallbacks {
     fun onLongPress(app: AppInfo, bounds: Rect)
 }
 
-private val CardShape = ContinuousRoundedShape(30.dp)
-private val CardPadding = 14.dp
-private val CardGap = 12.dp
-
 /**
- * The App Library, the last "page" of the Home Screen (as in iOS / iOS27L): a search pill
- * and every app grouped into category cards. Each card shows three apps big and, when
- * there are more, a 2×2 cluster that opens the whole category.
+ * The App Library, the last "page" of the Home Screen (as in iOS / iOS27L): a search pill,
+ * a button that switches the view, and the apps as category cards, one grid, or an A–Z list.
+ * Each view keeps its own scroll position while the launcher runs.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppLibraryPage(
-    categories: List<LibraryCategory>,
+    library: AppLibraryState?,
     onSearch: () -> Unit,
-    onOpenCategory: (String) -> Unit,
+    onOpenGroup: (String) -> Unit,
+    onViewChange: (LibraryView) -> Unit,
     callbacks: LibraryCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(24.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
-    ) {
-        item(span = { GridItemSpan(2) }) { LibrarySearchPill(onSearch) }
-        items(categories, key = { it.id }) { category ->
-            CategoryCard(category, onOpenCategory = { onOpenCategory(category.id) }, callbacks = callbacks)
-        }
+    if (library == null) {
+        Box(modifier.fillMaxSize())
+        return
+    }
+    // Hoisted, so switching views and back returns to where each one was.
+    val cardsState = rememberLazyGridState(LibraryCacheWindow)
+    val gridState = rememberLazyGridState(LibraryCacheWindow)
+    val listState = rememberLazyListState(LibraryCacheWindow)
+    val header: @Composable () -> Unit = { LibraryHeader(library.view, onSearch, onViewChange) }
+    when (library.view) {
+        LibraryView.Categories -> CategoriesView(library, header, onOpenGroup, callbacks, cardsState, modifier)
+        LibraryView.Grid -> AllAppsGrid(library, header, callbacks, gridState, modifier)
+        LibraryView.List -> AllAppsList(library, header, callbacks, listState, modifier)
     }
 }
 
+/** Search pill and the view button; scrolls with the content, like iOS. */
 @Composable
-private fun LibrarySearchPill(onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(46.dp)
-            .glass(CircleShape, profile = GlassProfile.Button)
-            .clickable(interactionSource = null, indication = null, onClick = onClick),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Filled.Search, contentDescription = null, tint = Tokens.TextPrimary, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(stringResource(R.string.library_title), color = Tokens.TextPrimary, fontSize = 18.sp)
-    }
-}
-
-@Composable
-private fun CategoryCard(category: LibraryCategory, onOpenCategory: () -> Unit, callbacks: LibraryCallbacks) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        BoxWithConstraints(
+private fun LibraryHeader(view: LibraryView, onSearch: () -> Unit, onViewChange: (LibraryView) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(
             Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .glass(CardShape, tint = Color.White.copy(alpha = 0.08f)),
+                .weight(1f)
+                .height(HeaderHeight)
+                .glass(CircleShape, profile = GlassProfile.Button)
+                .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onSearch),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            val big = (maxWidth - CardPadding * 2 - CardGap) / 2
-            val showCluster = category.apps.size > 4
-            val bigApps = category.apps.take(if (showCluster) 3 else 4)
-            bigApps.forEachIndexed { index, app ->
-                LibraryIcon(
-                    app = app,
-                    size = big,
-                    callbacks = callbacks,
-                    modifier = Modifier.offset(
-                        x = CardPadding + (big + CardGap) * (index % 2),
-                        y = CardPadding + (big + CardGap) * (index / 2),
-                    ),
-                )
-            }
-            if (showCluster) {
-                MiniCluster(
-                    apps = category.apps.drop(3).take(4),
-                    size = big,
-                    onClick = onOpenCategory,
-                    modifier = Modifier.offset(x = CardPadding + big + CardGap, y = CardPadding + big + CardGap),
-                )
-            }
+            Icon(Icons.Filled.Search, contentDescription = null, tint = Tokens.TextPrimary, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.library_title), color = Tokens.TextPrimary, fontSize = 18.sp)
         }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            category.title,
-            color = Tokens.TextPrimary,
-            fontSize = 14.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-/** 2×2 tiny icons in the corner of a category card; tapping it opens the category. */
-@Composable
-private fun MiniCluster(apps: List<AppInfo>, size: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val gap = size * 0.1f
-    val mini = (size - gap) / 2
-    Box(
-        modifier
-            .size(size)
-            .clickable(interactionSource = null, indication = null, onClick = onClick),
-    ) {
-        apps.forEachIndexed { index, app ->
-            AppIconImage(
-                app = app,
-                size = mini,
-                modifier = Modifier.offset(x = (mini + gap) * (index % 2), y = (mini + gap) * (index / 2)),
+        Spacer(Modifier.width(10.dp))
+        // One tap goes to the next view; it opens nothing and never shows the keyboard.
+        val next = LibraryView.entries[(view.ordinal + 1) % LibraryView.entries.size]
+        Box(
+            Modifier
+                .size(HeaderHeight)
+                .glass(CircleShape, profile = GlassProfile.Button)
+                .clickable(interactionSource = null, indication = null, role = Role.Button) { onViewChange(next) },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                view.icon,
+                contentDescription = stringResource(R.string.library_view_switch, stringResource(view.labelRes)),
+                tint = Tokens.TextPrimary,
+                modifier = Modifier.size(22.dp),
             )
         }
     }
 }
 
+private val HeaderHeight = 46.dp
+
+/**
+ * Rows a screen ahead are composed in idle frame time, so a fast fling doesn't compose several
+ * rows in one frame; half a screen behind stays composed for a fling back. One instance: the
+ * states are remembered with it as a key.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private val LibraryCacheWindow = LazyLayoutCacheWindow(aheadFraction = 1f, behindFraction = 0.5f)
+
+private val LibraryView.icon
+    get() = when (this) {
+        LibraryView.Categories -> Icons.Rounded.Dashboard
+        LibraryView.Grid -> Icons.Rounded.Apps
+        LibraryView.List -> Icons.AutoMirrored.Rounded.List
+    }
+
+/** Name of a view, in the library and in settings. */
+val LibraryView.labelRes: Int
+    get() = when (this) {
+        LibraryView.Categories -> R.string.library_view_categories
+        LibraryView.Grid -> R.string.library_view_grid
+        LibraryView.List -> R.string.library_view_list
+    }
+
+/**
+ * Window bounds of an element, computed only when asked (a tap), not on every scroll frame as
+ * `onGloballyPositioned` would.
+ */
+internal class WindowBounds {
+    private var coordinates: LayoutCoordinates? = null
+
+    /** Put on the element whose bounds [current] reports. */
+    val modifier: Modifier = Modifier.onPlaced { coordinates = it }
+
+    fun current(): Rect = coordinates?.takeIf { it.isAttached }?.boundsInWindow() ?: Rect.Zero
+}
+
 /** An App Library icon: tap opens the app, long-press shows its menu. */
 @Composable
-private fun LibraryIcon(app: AppInfo, size: Dp, callbacks: LibraryCallbacks, modifier: Modifier = Modifier) {
-    val haptic = LocalHapticFeedback.current
-    var bounds by remember { mutableStateOf(Rect.Zero) }
+internal fun LibraryIcon(app: AppInfo, size: Dp, callbacks: LibraryCallbacks, modifier: Modifier = Modifier) {
+    val haptic = launcherHaptics()
+    val bounds = remember { WindowBounds() }
     var pressed by remember { mutableStateOf(false) }
     val currentApp by rememberUpdatedState(app)
     AppIconImage(
@@ -198,7 +178,7 @@ private fun LibraryIcon(app: AppInfo, size: Dp, callbacks: LibraryCallbacks, mod
         size = size,
         dimmed = pressed,
         modifier = modifier
-            .onGloballyPositioned { bounds = it.boundsInWindow() }
+            .then(bounds.modifier)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
@@ -206,63 +186,22 @@ private fun LibraryIcon(app: AppInfo, size: Dp, callbacks: LibraryCallbacks, mod
                         tryAwaitRelease()
                         pressed = false
                     },
-                    onTap = { callbacks.onLaunch(currentApp, bounds) },
+                    onTap = { callbacks.onLaunch(currentApp, bounds.current()) },
                     onLongPress = {
                         haptic.performHapticFeedback(Haptics.Lift)
-                        callbacks.onLongPress(currentApp, bounds)
+                        callbacks.onLongPress(currentApp, bounds.current())
                     },
                 )
             },
     )
 }
 
-/**
- * A category opened full screen: big title and all its apps in a 4-column grid, over the
- * blurred Home Screen. Tapping empty space or Back closes it.
- */
+/** Icon and name, as in a category opened full screen and in the Grid view. */
 @Composable
-fun CategoryOverlay(category: LibraryCategory?, callbacks: LibraryCallbacks, onClose: () -> Unit) {
-    var last by remember { mutableStateOf(category) }
-    if (category != null) last = category
-    BackHandler(enabled = category != null, onBack = onClose)
-    AnimatedVisibility(
-        visible = category != null,
-        enter = fadeIn(Motion.fade()) + scaleIn(Motion.expand(), initialScale = 0.92f),
-        exit = fadeOut(Motion.fade()) + scaleOut(Motion.expand(), targetScale = 0.92f),
-    ) {
-        val shown = last ?: return@AnimatedVisibility
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.35f))
-                .pointerInput(Unit) { detectTapGestures { onClose() } },
-        ) {
-            Column(
-                Modifier
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .windowInsetsPadding(WindowInsets.navigationBars),
-            ) {
-                Text(
-                    shown.title,
-                    color = Tokens.TextPrimary,
-                    fontSize = 34.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 24.dp, top = 56.dp, bottom = 28.dp),
-                )
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(Tokens.GridColumns),
-                    contentPadding = PaddingValues(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    items(shown.apps, key = { it.key }) { app ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            LibraryIcon(app, Tokens.IconSize, callbacks)
-                            Spacer(Modifier.height(6.dp))
-                            IconLabel(app.label)
-                        }
-                    }
-                }
-            }
-        }
+internal fun LibraryCell(app: AppInfo, callbacks: LibraryCallbacks) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        LibraryIcon(app, Tokens.IconSize, callbacks)
+        Spacer(Modifier.height(6.dp))
+        IconLabel(app.label)
     }
 }

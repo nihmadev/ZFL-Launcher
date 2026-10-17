@@ -1,0 +1,203 @@
+package com.zfl.launcher.ui.library
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.zfl.launcher.data.AppGroup
+import com.zfl.launcher.data.AppInfo
+import com.zfl.launcher.data.AppLibraryState
+import com.zfl.launcher.ui.glass.glass
+import com.zfl.launcher.ui.icon.AppIconImage
+import com.zfl.launcher.ui.shape.ContinuousRoundedShape
+import com.zfl.launcher.ui.theme.Motion
+import com.zfl.launcher.ui.theme.Tokens
+
+private val CardShape = ContinuousRoundedShape(30.dp)
+private val CardPadding = 14.dp
+private val CardGap = 12.dp
+
+/**
+ * The Categories view: pinned apps, the smart groups and every category as a card. Each card
+ * shows three apps big and, when there are more, a 2×2 cluster that opens the whole group.
+ * Empty groups have no card.
+ */
+@Composable
+internal fun CategoriesView(
+    library: AppLibraryState,
+    header: @Composable () -> Unit,
+    onOpenGroup: (String) -> Unit,
+    callbacks: LibraryCallbacks,
+    state: LazyGridState,
+    modifier: Modifier = Modifier,
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        state = state,
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp),
+    ) {
+        item(key = "header", span = { GridItemSpan(2) }) { header() }
+        // Group ids never collide with each other: system, user and smart ids have their own forms.
+        items(library.cards, key = { "group:${it.id}" }) { group ->
+            CategoryCard(group, onOpenGroup = { onOpenGroup(group.id) }, callbacks = callbacks)
+        }
+    }
+}
+
+@Composable
+private fun CategoryCard(group: AppGroup, onOpenGroup: () -> Unit, callbacks: LibraryCallbacks) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .glass(CardShape, tint = Color.White.copy(alpha = 0.08f)),
+        ) {
+            val big = (maxWidth - CardPadding * 2 - CardGap) / 2
+            val showCluster = group.apps.size > 4
+            val bigApps = group.apps.take(if (showCluster) 3 else 4)
+            bigApps.forEachIndexed { index, app ->
+                LibraryIcon(
+                    app = app,
+                    size = big,
+                    callbacks = callbacks,
+                    modifier = Modifier.offset(
+                        x = CardPadding + (big + CardGap) * (index % 2),
+                        y = CardPadding + (big + CardGap) * (index / 2),
+                    ),
+                )
+            }
+            if (showCluster) {
+                MiniCluster(
+                    apps = group.apps.drop(3).take(4),
+                    size = big,
+                    onClick = onOpenGroup,
+                    modifier = Modifier.offset(x = CardPadding + big + CardGap, y = CardPadding + big + CardGap),
+                )
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            group.title,
+            color = Tokens.TextPrimary,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onOpenGroup),
+        )
+    }
+}
+
+/** 2×2 tiny icons in the corner of a category card; tapping it opens the group. */
+@Composable
+private fun MiniCluster(apps: List<AppInfo>, size: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val gap = size * 0.1f
+    val mini = (size - gap) / 2
+    Box(
+        modifier
+            .size(size)
+            .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick),
+    ) {
+        apps.forEachIndexed { index, app ->
+            AppIconImage(
+                app = app,
+                size = mini,
+                modifier = Modifier.offset(x = (mini + gap) * (index % 2), y = (mini + gap) * (index / 2)),
+            )
+        }
+    }
+}
+
+/**
+ * A group opened full screen: big title and all its apps in a 4-column grid, over the
+ * blurred Home Screen. Tapping empty space or Back closes it. A renamed group updates in
+ * place; the caller closes it when the group is gone.
+ */
+@Composable
+fun CategoryOverlay(group: AppGroup?, callbacks: LibraryCallbacks, onClose: () -> Unit) {
+    var last by remember { mutableStateOf(group) }
+    if (group != null) last = group
+    BackHandler(enabled = group != null, onBack = onClose)
+    AnimatedVisibility(
+        visible = group != null,
+        enter = fadeIn(Motion.fade()) + scaleIn(Motion.expand(), initialScale = 0.92f),
+        exit = fadeOut(Motion.fade()) + scaleOut(Motion.expand(), targetScale = 0.92f),
+    ) {
+        val shown = last ?: return@AnimatedVisibility
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
+                .pointerInput(Unit) { detectTapGestures { onClose() } },
+        ) {
+            Column(
+                Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+            ) {
+                Text(
+                    shown.title,
+                    color = Tokens.TextPrimary,
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 56.dp, bottom = 28.dp),
+                )
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(Tokens.LibraryColumns),
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(shown.apps, key = { it.key }) { app -> LibraryCell(app, callbacks) }
+                }
+            }
+        }
+    }
+}
