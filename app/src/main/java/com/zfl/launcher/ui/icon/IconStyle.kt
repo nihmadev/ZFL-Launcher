@@ -48,6 +48,7 @@ sealed interface IconStyle {
 
 /** Everything that is baked into icon bitmaps; a new value means new bitmaps. */
 data class IconSpec(
+    /** The general icon size (Settings › Icons); smaller icons get a thinner edge relative to it. */
     val sizePx: Int,
     val corner: Float,
     val style: IconStyle,
@@ -66,12 +67,12 @@ data class IconSpec(
 }
 
 /**
- * Cache key of one icon bitmap. [version] changes when the app is updated, [customStamp] when
- * the user picks another custom icon, so neither can show a stale bitmap.
+ * Cache key of one icon bitmap of [sizePx]. [version] changes when the app is updated,
+ * [customStamp] when the user picks another custom icon, so neither can show a stale bitmap.
  */
-fun iconCacheKey(appKey: String, version: Int, customStamp: Long?, spec: IconSpec): String {
+fun iconCacheKey(appKey: String, version: Int, customStamp: Long?, sizePx: Int, spec: IconSpec): String {
     val custom = if (customStamp != null) "@$customStamp" else ""
-    return "$appKey~$version$custom${spec.suffix(spec.styleFor(customStamp != null))}"
+    return "$appKey~$version$custom/$sizePx${spec.suffix(spec.styleFor(customStamp != null))}"
 }
 
 /** What the launcher knows about the wallpaper: [color] is `null` when it has none (e.g. some live wallpapers). */

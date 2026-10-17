@@ -13,6 +13,9 @@ class IconStyleTest {
     private fun spec(state: SettingsState, night: Boolean = false, tint: WallpaperTint? = wallpaper): IconSpec =
         state.iconSpec(BASE, night, tint)!!
 
+    private fun cacheKey(app: String, version: Int, stamp: Long?, spec: IconSpec): String =
+        iconCacheKey(app, version, stamp, spec.sizePx, spec)
+
     @Test
     fun autoFollowsNightModeOthersIgnoreIt() {
         assertEquals(IconAppearance.Default, IconAppearance.Auto.effective(nightMode = false))
@@ -63,38 +66,38 @@ class IconStyleTest {
     @Test
     fun cacheKeyChangesWithEverythingBakedIntoTheBitmap() {
         val base = spec(SettingsState())
-        val key = iconCacheKey(APP, 0, null, base)
-        assertNotEquals(key, iconCacheKey(APP, 1, null, base))
-        assertNotEquals(key, iconCacheKey(APP, 0, 42L, base))
-        assertNotEquals(iconCacheKey(APP, 0, 42L, base), iconCacheKey(APP, 0, 43L, base))
-        assertNotEquals(key, iconCacheKey(APP, 0, null, spec(SettingsState(iconScale = 1.2f))))
-        assertNotEquals(key, iconCacheKey(APP, 0, null, spec(SettingsState(iconCorner = 0.3f))))
-        assertNotEquals(key, iconCacheKey(APP, 0, null, spec(SettingsState(iconAppearance = IconAppearance.Dark))))
-        assertNotEquals(key, iconCacheKey(APP, 0, null, spec(SettingsState(iconEdge = false))))
+        val key = cacheKey(APP, 0, null, base)
+        assertNotEquals(key, cacheKey(APP, 1, null, base))
+        assertNotEquals(key, cacheKey(APP, 0, 42L, base))
+        assertNotEquals(cacheKey(APP, 0, 42L, base), cacheKey(APP, 0, 43L, base))
+        assertNotEquals(key, cacheKey(APP, 0, null, spec(SettingsState(iconScale = 1.2f))))
+        assertNotEquals(key, cacheKey(APP, 0, null, spec(SettingsState(iconCorner = 0.3f))))
+        assertNotEquals(key, cacheKey(APP, 0, null, spec(SettingsState(iconAppearance = IconAppearance.Dark))))
+        assertNotEquals(key, cacheKey(APP, 0, null, spec(SettingsState(iconEdge = false))))
         val tinted = SettingsState(iconAppearance = IconAppearance.Tinted, iconTintFromWallpaper = false)
         assertNotEquals(
-            iconCacheKey(APP, 0, null, spec(tinted.copy(iconTintColor = ICON_TINT_PALETTE[0]))),
-            iconCacheKey(APP, 0, null, spec(tinted.copy(iconTintColor = ICON_TINT_PALETTE[5]))),
+            cacheKey(APP, 0, null, spec(tinted.copy(iconTintColor = ICON_TINT_PALETTE[0]))),
+            cacheKey(APP, 0, null, spec(tinted.copy(iconTintColor = ICON_TINT_PALETTE[5]))),
         )
-        assertNotEquals(key, iconCacheKey("other#0", 0, null, base))
+        assertNotEquals(key, cacheKey("other#0", 0, null, base))
     }
 
     @Test
     fun customIconsCanOptOutOfRestyling() {
         val dark = SettingsState(iconAppearance = IconAppearance.Dark)
         val optOut = dark.copy(tintCustomIcons = false)
-        assertEquals(iconCacheKey(APP, 0, 7L, spec(SettingsState())), iconCacheKey(APP, 0, 7L, spec(optOut)))
-        assertNotEquals(iconCacheKey(APP, 0, 7L, spec(SettingsState())), iconCacheKey(APP, 0, 7L, spec(dark)))
+        assertEquals(cacheKey(APP, 0, 7L, spec(SettingsState())), cacheKey(APP, 0, 7L, spec(optOut)))
+        assertNotEquals(cacheKey(APP, 0, 7L, spec(SettingsState())), cacheKey(APP, 0, 7L, spec(dark)))
         // App icons are restyled either way.
-        assertNotEquals(iconCacheKey(APP, 0, null, spec(SettingsState())), iconCacheKey(APP, 0, null, spec(optOut)))
+        assertNotEquals(cacheKey(APP, 0, null, spec(SettingsState())), cacheKey(APP, 0, null, spec(optOut)))
     }
 
     @Test
     fun keysOfASpecMatchItsSuffixesOnly() {
         val tinted = spec(SettingsState(iconAppearance = IconAppearance.Tinted, tintCustomIcons = false))
-        val keys = listOf(iconCacheKey(APP, 3, null, tinted), iconCacheKey(APP, 3, 9L, tinted))
+        val keys = listOf(cacheKey(APP, 3, null, tinted), cacheKey(APP, 3, 9L, tinted))
         for (key in keys) assertTrue(tinted.keySuffixes().any(key::endsWith))
-        val old = iconCacheKey(APP, 3, null, spec(SettingsState(iconAppearance = IconAppearance.Dark)))
+        val old = cacheKey(APP, 3, null, spec(SettingsState(iconAppearance = IconAppearance.Dark)))
         assertTrue(tinted.keySuffixes().none(old::endsWith))
     }
 

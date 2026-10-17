@@ -41,10 +41,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Renders app icons into bitmaps of [baseSizePx] × the user's icon scale, already cut to the
- * user's icon shape (a squircle by default), with the glass edge highlight if enabled, and
- * drawn in the user's [IconAppearance], so every
- * icon looks consistent and the UI draws them as plain images, with no per-frame clipping or filters.
+ * Renders app icons into bitmaps of the size they are drawn at, already cut to the user's
+ * icon shape (a squircle by default), with the glass edge highlight if enabled, and drawn in
+ * the user's [IconAppearance], so every icon looks consistent and the UI draws them as plain
+ * images, with no per-frame clipping or filters. One bounded cache serves every size.
  *
  * The current [IconSpec] (size, shape, resolved style) follows the settings, the system night
  * mode (for Auto) and the wallpaper colors (for Tinted "from wallpaper"). It is snapshot state:
@@ -142,34 +142,33 @@ class IconLoader(
      * It changes with a custom icon, an app update or any setting baked into the bitmap, so
      * callers can use it as an effect key to reload.
      */
-    fun cacheKey(app: AppInfo): String? {
+    fun cacheKey(app: AppInfo, sizePx: Int): String? {
         val spec = spec ?: return null
-        return iconCacheKey(app.key, app.iconVersion, customIcons[app.key], spec)
+        return iconCacheKey(app.key, app.iconVersion, customIcons[app.key], sizePx, spec)
     }
 
-    /** Returns the icon if it is already rendered, without blocking. */
-    fun cached(app: AppInfo): ImageBitmap? = cacheKey(app)?.let(cache::get)
+    /** Returns the icon of [sizePx] if it is already rendered, without blocking. */
+    fun cached(app: AppInfo, sizePx: Int): ImageBitmap? = cacheKey(app, sizePx)?.let(cache::get)
 
     /**
      * Returns the cached icon or renders it (custom image first, then the app's own icon) off
      * the main thread. `null` while the spec is not known yet.
      */
-    suspend fun load(app: AppInfo): ImageBitmap? {
+    suspend fun load(app: AppInfo, sizePx: Int): ImageBitmap? {
         val spec = spec ?: return null
         val stamp = customIcons[app.key]
-        val key = iconCacheKey(app.key, app.iconVersion, stamp, spec)
+        val key = iconCacheKey(app.key, app.iconVersion, stamp, sizePx, spec)
         cache.get(key)?.let { return it }
         return withContext(Dispatchers.IO) {
             val density = resources.displayMetrics.densityDpi
-            val icon = stamp?.let { loadCustom(app, spec) } ?: render(app.info.getIcon(density), spec)
+            val icon = stamp?.let { loadCustom(app, spec, sizePx) } ?: render(app.info.getIcon(density), spec, sizePx)
             if (liveSuffixes.any(key::endsWith)) cache.put(key, icon)
             icon
         }
     }
 
-    private fun loadCustom(app: AppInfo, spec: IconSpec): ImageBitmap? {
+    private fun loadCustom(app: AppInfo, spec: IconSpec, s: Int): ImageBitmap? {
         val bitmap = BitmapFactory.decodeFile(settings.customIconFile(app.key).path) ?: return null
-        val s = spec.sizePx
         val scaled = bitmap.scale(s, s)
         // The decoded file may be immutable (and scaling to its own size returns it as is).
         var icon = if (scaled.isMutable) scaled else scaled.copy(Bitmap.Config.ARGB_8888, true)
@@ -179,17 +178,18 @@ class IconLoader(
             drawCustom(icon, Canvas(styled), s, style)
             icon = styled
         }
-        return finish(icon, spec)
+        return finish(icon, spec, s)
     }
 
     fun clear(): Unit = cache.evictAll()
 
     /** Renders any drawable into an icon-sized square bitmap in the current style. Also used for shortcut icons. */
-    fun render(drawable: Drawable): ImageBitmap =
-        render(drawable, spec ?: prefs.iconSpec(baseSizePx, nightMode, WallpaperTint(null)) ?: error("spec without wallpaper"))
+    fun render(drawable: Drawable): ImageBitmap {
+        val spec = spec ?: prefs.iconSpec(baseSizePx, nightMode, WallpaperTint(null)) ?: error("spec without wallpaper")
+        return render(drawable, spec, spec.sizePx)
+    }
 
-    private fun render(drawable: Drawable, spec: IconSpec): ImageBitmap {
-        val s = spec.sizePx
+    private fun render(drawable: Drawable, spec: IconSpec, s: Int): ImageBitmap {
         val bitmap = createBitmap(s, s)
         val canvas = Canvas(bitmap)
         if (drawable is AdaptiveIconDrawable) {
@@ -197,13 +197,16 @@ class IconLoader(
         } else {
             drawLegacy(drawable, canvas, s, spec.style)
         }
-        return finish(bitmap, spec)
+        return finish(bitmap, spec, s)
     }
 
-    /** Cuts the icon to its shape and adds the edge highlight. */
-    private fun finish(bitmap: Bitmap, spec: IconSpec): ImageBitmap {
+    /**
+     * Cuts the icon to its shape and adds the edge highlight. Icons smaller than the general
+     * size get a proportionally thinner edge, as they had when they were scaled-down copies.
+     */
+    private fun finish(bitmap: Bitmap, spec: IconSpec, sizePx: Int): ImageBitmap {
         maskToSquircle(bitmap, spec.corner)
-        if (spec.edge) drawEdge(bitmap, spec.corner)
+        if (spec.edge) drawEdge(bitmap, spec.corner, (sizePx.toFloat() / spec.sizePx).coerceAtMost(1f))
         return bitmap.asImageBitmap()
     }
 
@@ -221,8 +224,8 @@ class IconLoader(
      * The same top-lit stroke glass surfaces have ([com.zfl.launcher.ui.glass.glass]), kept just
      * inside the outline so the icon itself and its size stay untouched.
      */
-    private fun drawEdge(bitmap: Bitmap, corner: Float) {
-        val width = Tokens.GlassStrokeWidth.value * resources.displayMetrics.density
+    private fun drawEdge(bitmap: Bitmap, corner: Float, scale: Float) {
+        val width = Tokens.GlassStrokeWidth.value * resources.displayMetrics.density * scale
         val side = bitmap.width - width
         val path = iconOutline(side, side, corner).asAndroidPath().apply { offset(width / 2, width / 2) }
         val stroke = Tokens.GlassStroke
@@ -240,7 +243,7 @@ class IconLoader(
     }
 
     private companion object {
-        /** About 300 icons at the default size. */
+        /** About 300 icons at the default size, fewer at bigger sizes. */
         const val MAX_CACHE_BYTES = 36 * 1024 * 1024
     }
 }

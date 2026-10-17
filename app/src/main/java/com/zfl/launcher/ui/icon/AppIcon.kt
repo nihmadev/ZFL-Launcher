@@ -20,6 +20,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -33,7 +35,11 @@ val LocalIconLoader = staticCompositionLocalOf<IconLoader> { error("IconLoader n
 
 /**
  * Just the icon image (the bitmap is already cut to a squircle and styled by [IconLoader]).
- * Loads asynchronously. [dimmed] darkens it the way iOS does while the icon is pressed.
+ * Loads asynchronously, rendered at the size it is drawn. [dimmed] darkens it the way iOS
+ * does while the icon is pressed.
+ *
+ * @param renderSize size of the bitmap when [size] changes every frame (a slider preview):
+ *   the saved size, so dragging doesn't render a bitmap per frame.
  */
 @Composable
 fun AppIconImage(
@@ -41,16 +47,18 @@ fun AppIconImage(
     modifier: Modifier = Modifier,
     size: Dp = LocalSettingsState.current.iconSize,
     dimmed: Boolean = false,
+    renderSize: Dp = size,
 ) {
     val loader = LocalIconLoader.current
-    // Changes with a custom icon, an app update, the icon size, shape or appearance, which
+    val sizePx = with(LocalDensity.current) { renderSize.roundToPx() }.coerceAtLeast(1)
+    // Changes with a custom icon, an app update, the size, shape or appearance, which
     // triggers a reload. Reading it subscribes this scope only, not its parents.
-    val cacheKey = loader.cacheKey(app)
-    val bitmap = remember(app.key) { mutableStateOf(loader.cached(app)) }
+    val cacheKey = loader.cacheKey(app, sizePx)
+    val bitmap = remember(app.key) { mutableStateOf(loader.cached(app, sizePx)) }
     LaunchedEffect(cacheKey) {
         if (cacheKey == null) return@LaunchedEffect
         // The previous bitmap stays visible until the new one is ready: no blink on a restyle.
-        bitmap.value = loader.cached(app) ?: loader.load(app) ?: return@LaunchedEffect
+        bitmap.value = loader.cached(app, sizePx) ?: loader.load(app, sizePx) ?: return@LaunchedEffect
     }
     val label = app.label
     Spacer(
@@ -75,17 +83,33 @@ fun AppIconImage(
 
 private val PressedDim = ColorFilter.tint(Color.Black.copy(alpha = 0.3f), BlendMode.SrcAtop)
 
+/** Name under an icon at [scale] × the label size, in sp, so the system font size applies too. */
 @Composable
-fun IconLabel(text: String) {
+fun IconLabel(text: String, scale: Float = LocalSettingsState.current.labelScale) {
     Text(
         text = text,
-        style = TextStyle(
-            color = Tokens.TextPrimary,
-            fontSize = Tokens.LabelSize * LocalSettingsState.current.labelScale,
-            textAlign = TextAlign.Center,
-            shadow = Shadow(Color.Black.copy(alpha = 0.4f), Offset(0f, 1f), 4f),
-        ),
+        style = iconLabelStyle(scale),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
 }
+
+fun iconLabelStyle(scale: Float): TextStyle = TextStyle(
+    color = Tokens.TextPrimary,
+    fontSize = Tokens.LabelSize * scale,
+    textAlign = TextAlign.Center,
+    shadow = Shadow(Color.Black.copy(alpha = 0.4f), Offset(0f, 1f), 4f),
+)
+
+/** Height of one line of [IconLabel] at [scale], measured with the current density and font scale. */
+@Composable
+fun rememberLabelLineHeight(scale: Float): Dp {
+    val measurer = rememberTextMeasurer(cacheSize = 4)
+    val density = LocalDensity.current
+    return remember(scale, density) {
+        with(density) { measurer.measure(LABEL_SAMPLE, iconLabelStyle(scale), maxLines = 1).size.height.toDp() }
+    }
+}
+
+/** Ascenders and descenders, so the line is as tall as any name. */
+private const val LABEL_SAMPLE = "Ág"
