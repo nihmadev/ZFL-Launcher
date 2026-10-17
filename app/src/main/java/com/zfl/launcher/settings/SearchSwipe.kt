@@ -1,6 +1,6 @@
 package com.zfl.launcher.settings
 
-/** Vertical gesture that opens app search on a home screen page. */
+/** Legacy search direction, retained only for reading pre-assignment preferences. */
 enum class SearchSwipe {
     Disabled, Down, Up;
 

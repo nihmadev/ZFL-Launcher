@@ -10,7 +10,7 @@ class SearchSwipeTest {
     fun oldToggleAndFreshInstallKeepTheirBehavior() {
         assertEquals(SearchSwipe.Down, SearchSwipe.fromStored(null, legacyEnabled = true))
         assertEquals(SearchSwipe.Disabled, SearchSwipe.fromStored(null, legacyEnabled = false))
-        assertEquals(SearchSwipe.Down, SettingsState().searchSwipe)
+        assertEquals(HomeAction.Search, SettingsState().homeBehavior.swipeDown)
     }
 
     @Test
