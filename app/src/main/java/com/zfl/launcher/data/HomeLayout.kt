@@ -1,7 +1,6 @@
 package com.zfl.launcher.data
 
 import com.zfl.launcher.settings.SettingsState
-import com.zfl.launcher.ui.theme.Tokens
 
 /** Something drawn in a home screen cell: [LayoutData] items resolved to real apps. */
 sealed interface HomeEntry {
@@ -69,7 +68,8 @@ val HomeEntry.span: Span
 data class HomeState(
     val pages: List<List<HomeEntry>> = listOf(emptyList()),
     val dock: List<HomeEntry> = emptyList(),
-    val rows: Int = Tokens.GridRows,
+    /** Grid of the pages, the one [cells] are addressed in. */
+    val grid: GridSpec = GridSpec.Default,
     /** Widgets of the Today page. */
     val today: List<PageWidgetEntry> = emptyList(),
     /** Resolved top-left cells, also shared by hit tests and drag previews. */
@@ -81,13 +81,27 @@ data class HomeState(
 }
 
 /**
- * Resolves the saved [layout] against the installed [apps], applying custom labels.
- * Shared by the home screen and the live preview in settings, so both always agree.
- *
- * @param rows grid rows; when it differs from the layout's own (the settings preview),
- *   pages are re-flowed for the new size.
+ * [reconcile] with what the launcher knows now: the installed apps and paused profiles of
+ * [apps], the hidden apps, the dock size and where new installs go. The launcher and the
+ * settings previews both use it, so they agree.
  */
-fun buildHomeLayout(layout: LayoutData, apps: List<AppInfo>, prefs: SettingsState, rows: Int = prefs.gridRows): HomeState {
+fun LayoutData.syncedWith(apps: AppSnapshot, prefs: SettingsState): LayoutData {
+    val (hidden, visible) = apps.apps.partition { it.key in prefs.hiddenApps }
+    return reconcile(
+        installed = visible.map { it.key },
+        dockCapacity = prefs.dockSlots,
+        hidden = hidden.mapTo(HashSet()) { it.key },
+        unavailableUsers = apps.unavailableUsers,
+        newApps = prefs.library.newApps,
+    )
+}
+
+/**
+ * Resolves the saved [layout] against the installed [apps], applying custom labels.
+ * Shared by the home screen and the live preview in settings, so both always agree; the
+ * preview of another grid passes the layout already moved to it ([withGrid]).
+ */
+fun buildHomeLayout(layout: LayoutData, apps: List<AppInfo>, prefs: SettingsState): HomeState {
     val byKey = apps.associateBy { it.key }
     fun app(key: String): AppInfo? = byKey[key]?.let { app ->
         prefs.customLabels[key]?.let(app::withLabel) ?: app
@@ -97,12 +111,12 @@ fun buildHomeLayout(layout: LayoutData, apps: List<AppInfo>, prefs: SettingsStat
         is FolderItem -> FolderEntry(item.id, item.name, item.apps.mapNotNull(::app)).takeIf { it.apps.isNotEmpty() }
         is PageWidget -> item.toEntry()
     }
-    val arranged = layout.normalized(Tokens.GridColumns * rows, prefs.dockSlots).withPageCells(Tokens.GridColumns * rows)
+    val arranged = layout.normalized(prefs.dockSlots).withPageCells()
     return HomeState(
         pages = arranged.pages.map { page -> page.mapNotNull(::resolve) },
         dock = arranged.dock.mapNotNull(::resolve),
         cells = arranged.cells,
-        rows = rows,
+        grid = arranged.grid,
         today = layout.today.map { it.toEntry() },
     )
 }
