@@ -6,20 +6,39 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
+import android.os.Build
 import android.os.Environment
 import android.view.WindowManager
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.createBitmap
+import com.zfl.launcher.ui.theme.LiquidGlassTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.max
 
 /**
- * Blurred copy of the wallpaper, laid out exactly like the system draws it on screen
- * but [downscale] times smaller. Glass surfaces sample their region from it.
+ * Wallpaper images for glass surfaces, laid out exactly like the system draws the wallpaper
+ * on screen but downscaled. Glass surfaces sample their region from them.
+ *
+ * @param image blurred and saturated copy, [downscale] times smaller: the Frosted glass and
+ *   the body of Liquid glass.
+ * @param sharp unblurred copy, [sharpDownscale] times smaller: the refracting rim of Liquid
+ *   glass. The same bitmap as the home blur backdrop, so it costs no extra memory.
+ * @param luminance brightness of [image] for the adaptive tone of Liquid glass.
+ * @param body the flat middle of Liquid glass, [sharpDownscale] times smaller: the sharp
+ *   wallpaper mixed with a light blur of itself and saturated, all baked in once so the
+ *   shader needs a single lookup there. Only made when Liquid glass is possible (Android 13+
+ *   and [sharp] given).
  */
-class GlassSource(val image: ImageBitmap, val downscale: Int)
+class GlassSource(
+    val image: ImageBitmap,
+    val downscale: Int,
+    val sharp: ImageBitmap? = null,
+    val sharpDownscale: Int = WallpaperBlur.PREVIEW_DOWNSCALE,
+    val luminance: LuminanceMap? = null,
+    val body: ImageBitmap? = null,
+)
 
 /**
  * Loads and blurs the system wallpaper for glass surfaces.
@@ -30,11 +49,15 @@ class GlassSource(val image: ImageBitmap, val downscale: Int)
  */
 object WallpaperBlur {
     const val DOWNSCALE = 8
-    /** Sharp wallpaper shared by previews and the full home backdrop; bounds bitmap memory. */
+    /** Sharp wallpaper shared by previews, the full home backdrop and the Liquid glass rim; bounds bitmap memory. */
     const val PREVIEW_DOWNSCALE: Int = 3
     /** Blur radius in downscaled pixels (~56 screen px). */
     private const val RADIUS = 7
-    private const val SATURATION = 1.6f
+    /** Liquid glass scattering: a light blur (~13 screen px) that keeps the wallpaper recognisable. */
+    private const val FROST_RADIUS = 4
+
+    /** Saturation boost of the blurred copy; Liquid glass applies it to the sharp copy too. */
+    const val SATURATION: Float = 1.6f
 
     /** On Android 13+ the wallpaper bitmap is only readable with "All files access". */
     fun hasAccess(): Boolean = Environment.isExternalStorageManager()
@@ -44,11 +67,17 @@ object WallpaperBlur {
         WallpaperManager.getInstance(context).getWallpaperId(WallpaperManager.FLAG_SYSTEM)
     }.getOrDefault(-1)
 
-    /** Returns `null` when the wallpaper is not readable (no permission or live wallpaper). */
-    suspend fun load(context: Context): GlassSource? = withContext(Dispatchers.Default) {
+    /**
+     * Blurs the wallpaper for glass surfaces; [sharp] is the [loadPreview] image of the same
+     * wallpaper, if any. Returns `null` when the wallpaper is not readable (no permission or
+     * live wallpaper).
+     */
+    suspend fun load(context: Context, sharp: ImageBitmap? = null): GlassSource? = withContext(Dispatchers.Default) {
         val small = render(context, DOWNSCALE, SATURATION) ?: return@withContext null
-        boxBlur(small, RADIUS, passes = 3)
-        GlassSource(small.asImageBitmap(), DOWNSCALE)
+        val pixels = boxBlur(small, RADIUS, passes = 3)
+        val luminance = LuminanceMap.fromArgb(pixels, small.width, small.height)
+        val body = if (sharp != null && isLiquidGlassSupported(Build.VERSION.SDK_INT)) renderBody(context) else null
+        GlassSource(small.asImageBitmap(), DOWNSCALE, sharp, PREVIEW_DOWNSCALE, luminance, body)
     }
 
     /**
@@ -59,10 +88,39 @@ object WallpaperBlur {
         render(context, downscale, saturation = 1f)?.asImageBitmap()
     }
 
+    /** The body of Liquid glass: the saturated wallpaper with [LiquidGlassTokens.Frost] of a light blur mixed in. */
+    private fun renderBody(context: Context): ImageBitmap? {
+        val bitmap = render(context, PREVIEW_DOWNSCALE, SATURATION) ?: return null
+        val w = bitmap.width
+        val h = bitmap.height
+        val sharp = IntArray(w * h)
+        bitmap.getPixels(sharp, 0, w, 0, 0, w, h)
+        val blurred = boxBlur(bitmap, FROST_RADIUS, passes = 3)
+        val t = (LiquidGlassTokens.Frost * 256).toInt().coerceIn(0, 256)
+        for (i in blurred.indices) blurred[i] = mixArgb(sharp[i], blurred[i], t)
+        bitmap.setPixels(blurred, 0, w, 0, 0, w, h)
+        return bitmap.asImageBitmap()
+    }
+
+    /** a + (b - a) × t / 256 per channel. */
+    private fun mixArgb(a: Int, b: Int, t: Int): Int {
+        var out = 0
+        for (shift in 0..24 step 8) {
+            val ca = (a ushr shift) and 0xFF
+            val cb = (b ushr shift) and 0xFF
+            out = out or ((ca + ((cb - ca) * t shr 8)) shl shift)
+        }
+        return out
+    }
+
     /** Draws the wallpaper center-cropped to the screen, like the system does, [downscale] times smaller. */
     private fun render(context: Context, downscale: Int, saturation: Float): Bitmap? {
         if (!hasAccess()) return null
-        val drawable = runCatching { WallpaperManager.getInstance(context).drawable }.getOrNull() ?: return null
+        val manager = WallpaperManager.getInstance(context)
+        // A live wallpaper is drawn by its own service; the static image Android still keeps
+        // would not match the screen, so glass falls back to its flat tint instead.
+        if (manager.wallpaperInfo != null) return null
+        val drawable = runCatching { manager.drawable }.getOrNull() ?: return null
 
         val screen = context.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
         val sw = screen.width()
@@ -90,8 +148,8 @@ object WallpaperBlur {
         return small
     }
 
-    /** Three box blur passes approximate a gaussian. Cheap because the bitmap is tiny. */
-    private fun boxBlur(bitmap: Bitmap, radius: Int, passes: Int) {
+    /** Three box blur passes approximate a gaussian. Cheap because the bitmap is tiny. Returns the blurred pixels. */
+    private fun boxBlur(bitmap: Bitmap, radius: Int, passes: Int): IntArray {
         val w = bitmap.width
         val h = bitmap.height
         val src = IntArray(w * h)
@@ -102,6 +160,7 @@ object WallpaperBlur {
             blurLine(tmp, src, w, h, radius, horizontal = false)
         }
         bitmap.setPixels(src, 0, w, 0, 0, w, h)
+        return src
     }
 
     private fun blurLine(input: IntArray, output: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
