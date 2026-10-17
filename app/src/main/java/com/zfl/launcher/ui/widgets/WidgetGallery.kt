@@ -13,6 +13,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
@@ -65,18 +68,21 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.data.WidgetEntry
 import com.zfl.launcher.data.WidgetKind
 import com.zfl.launcher.data.WidgetSize
+import com.zfl.launcher.ui.glass.GlassProfile
+import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
 import com.zfl.launcher.R
 import com.zfl.launcher.ui.theme.Motion
 
-private val SheetColor = Color(0xFF242426)
-private val FieldColor = Color(0xFF3A3A3C)
 private val SheetShape = RoundedCornerShape(topStart = 34.dp, topEnd = 34.dp)
 
 /** Widgets shown as big previews at the top of the gallery, like iOS27L. */
@@ -112,7 +118,7 @@ fun WidgetGallery(
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
+                .background(Tokens.Scrim)
                 .pointerInput(Unit) { detectTapGestures { onClose() } },
         )
     }
@@ -127,7 +133,7 @@ fun WidgetGallery(
                 .fillMaxSize()
                 .padding(top = 56.dp)
                 .clip(SheetShape)
-                .background(SheetColor)
+                .glass(SheetShape, tint = Tokens.SheetTint)
                 .pointerInput(Unit) { detectTapGestures { } }
                 .windowInsetsPadding(WindowInsets.navigationBars),
         ) {
@@ -201,7 +207,7 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
         Modifier
             .fillMaxWidth()
             .height(42.dp)
-            .background(FieldColor, CircleShape)
+            .glass(CircleShape, profile = GlassProfile.Button)
             .padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -215,7 +221,7 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
                 onValueChange = onChange,
                 singleLine = true,
                 textStyle = TextStyle(color = Tokens.TextPrimary, fontSize = 16.sp),
-                cursorBrush = SolidColor(Tokens.Accent),
+                cursorBrush = SolidColor(LocalAccent.current.primary),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -279,24 +285,12 @@ internal fun GalleryDetail(
 ) {
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(30.dp)
-                    .background(FieldColor, CircleShape)
-                    .clickable(onClick = onBack),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.ChevronLeft, stringResource(R.string.action_back), tint = Tokens.TextSecondary, modifier = Modifier.size(22.dp)) }
+            CircleButton(Icons.Rounded.ChevronLeft, stringResource(R.string.action_back), 22.dp, onBack)
             Spacer(Modifier.width(12.dp))
             icon()
             Spacer(Modifier.width(14.dp))
             Text(name, color = Tokens.TextPrimary, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Box(
-                Modifier
-                    .size(30.dp)
-                    .background(FieldColor, CircleShape)
-                    .clickable(onClick = onClose),
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Rounded.Close, stringResource(R.string.action_cancel), tint = Tokens.TextSecondary, modifier = Modifier.size(18.dp)) }
+            CircleButton(Icons.Rounded.Close, stringResource(R.string.action_cancel), 18.dp, onClose)
         }
         Text(
             title,
@@ -326,29 +320,53 @@ internal fun GalleryDetail(
                 )
             }
         }
+        val addInteraction = remember { MutableInteractionSource() }
+        val addPressed by addInteraction.collectIsPressedAsState()
         Row(
             Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
                 .height(52.dp)
-                .clip(ContinuousRoundedShape(18.dp))
-                .background(Tokens.Accent)
-                .clickable(onClick = onAdd),
+                .clip(CircleShape)
+                .background(LocalAccent.current.primary)
+                .graphicsLayer { alpha = if (addPressed) 0.7f else 1f }
+                .clickable(addInteraction, indication = null, onClick = onAdd),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.AddCircle, null, tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.Rounded.AddCircle, null, tint = LocalAccent.current.onPrimary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.widget_add), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(stringResource(R.string.widget_add), color = LocalAccent.current.onPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         }
     }
+}
+
+/** Round glass button of the detail header. */
+@Composable
+private fun CircleButton(icon: ImageVector, label: String, iconSize: Dp, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .size(32.dp)
+            .glass(CircleShape, profile = GlassProfile.SmallButton)
+            .clickable(interactionSource = null, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, label, tint = Tokens.TextPrimary, modifier = Modifier.size(iconSize)) }
 }
 
 /** A row of the gallery list: an icon, a name and a hairline divider. */
 @Composable
 internal fun GalleryRow(icon: @Composable () -> Unit, title: String, onClick: () -> Unit) {
-    Column(Modifier.clickable(onClick = onClick)) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    Column(Modifier.clickable(interaction, indication = null, onClick = onClick)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(ContinuousRoundedShape(14.dp))
+                .background(if (pressed) Color.White.copy(alpha = 0.1f) else Color.Transparent)
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             icon()
             Spacer(Modifier.width(16.dp))
             Text(title, color = Tokens.TextPrimary, fontSize = 17.sp)
