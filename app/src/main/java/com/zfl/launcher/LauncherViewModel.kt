@@ -42,28 +42,26 @@ import com.zfl.launcher.data.HomeState
 import com.zfl.launcher.data.LayoutData
 import com.zfl.launcher.data.LaunchStats
 import com.zfl.launcher.data.LayoutRepository
-import com.zfl.launcher.data.LibraryCategory
 import com.zfl.launcher.data.addToHome
-import com.zfl.launcher.data.buildAppLibrary
+import com.zfl.launcher.data.syncedWith
+import com.zfl.launcher.data.visibleApps
 import com.zfl.launcher.data.LayoutStore
 import com.zfl.launcher.data.removeFromHome
 import com.zfl.launcher.data.buildHomeLayout
 import com.zfl.launcher.data.move
-import com.zfl.launcher.data.reconcile
 import com.zfl.launcher.data.renameFolder
 import com.zfl.launcher.settings.LauncherSettings
 import com.zfl.launcher.ui.glass.GlassSource
 import com.zfl.launcher.ui.glass.WallpaperBlur
-import com.zfl.launcher.ui.theme.Tokens
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -75,6 +73,8 @@ data class MenuTarget(
     val shortcuts: List<ShortcutInfo>,
     /** False for apps opened from the App Library that aren't on the Home Screen. */
     val onHome: Boolean = true,
+    /** Opened from the App Library: offers pinning and the category there. */
+    val inLibrary: Boolean = false,
 )
 
 /** Which search UI is open. */
@@ -103,27 +103,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** The persisted arrangement; null until loaded. Always normalized for the current grid size. */
     private val layout: StateFlow<LayoutData?> = layoutRepository.layout
 
+    private val initialHome: HomeState = HomeState()
+    val homeLoaded: Boolean get() = state.value !== initialHome
+
     val state: StateFlow<HomeState> = combine(layout.filterNotNull(), repository.apps, settings.state) { layout, apps, prefs ->
         buildHomeLayout(layout, apps, prefs)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeState())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, initialHome)
 
     val launchStats: LaunchStats = LaunchStats.get(app)
 
     /** Visible (not hidden) apps with custom labels applied, alphabetically. Used by search. */
-    val visibleApps: StateFlow<List<AppInfo>> = combine(repository.apps, settings.state) { apps, prefs ->
-        apps.filter { it.key !in prefs.hiddenApps }
-            .map { app -> prefs.customLabels[app.key]?.let(app::withLabel) ?: app }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    /** App Library groups, rebuilt when apps, settings or usage change. */
-    val library: StateFlow<List<LibraryCategory>> = combine(visibleApps, launchStats.scores) { apps, scores ->
-        buildAppLibrary(getApplication(), apps, scores)
-    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val visibleApps: StateFlow<List<AppInfo>> =
+        combine(repository.apps, settings.state.map { it.hiddenApps to it.customLabels }.distinctUntilChanged()) { apps, _ ->
+            visibleApps(apps, settings.state.value)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val search: MutableStateFlow<SearchMode?> = MutableStateFlow(null)
-
-    /** App Library category opened full screen (its id). */
-    val openCategory: MutableStateFlow<String?> = MutableStateFlow(null)
 
     val weather: WeatherRepository = WeatherRepository.get(app)
     val appWidgets: AppWidgets = AppWidgets.get(app)
@@ -155,10 +150,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** App whose "−" badge was tapped: shows the remove dialog. */
     val removeRequest: MutableStateFlow<AppInfo?> = MutableStateFlow(null)
 
-    /** Emits when the user comes back to the home screen from an app (for the resume animation). */
+    /** A real return from a launched app or a background Home Intent, for the return policy. */
+    val returnToHome: MutableSharedFlow<Unit> = MutableSharedFlow(extraBufferCapacity = 1)
+
+    /** Existing visual resume event, independent of Home command dispatch. */
     val returnedHome: MutableSharedFlow<Unit> = MutableSharedFlow(extraBufferCapacity = 1)
 
-    /** Emits when Home is pressed while already on the home screen: close everything, go to page 1. */
+    /** Emits when Home is pressed while already on the home screen: close the top state or execute RepeatHome. */
     val homePressed: MutableSharedFlow<Unit> = MutableSharedFlow(extraBufferCapacity = 1)
 
     /** Blurred wallpaper for glass surfaces; `null` until loaded or when not accessible. */
@@ -169,8 +167,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private var wallpaperId = Int.MIN_VALUE
     private var wallpaperJob: Job? = null
 
-    private val pageCapacity: Int get() = Tokens.GridColumns * settings.state.value.gridRows
     private val dockCapacity: Int get() = settings.state.value.dockSlots
+
+    /** Every layout change goes through here; arranging stops while the layout is locked. */
+    private val writer = LayoutWriter(layout, layoutRepository::update) { settings.state.value.layoutLocked }
+
+    /** Whether the user may rearrange the Home Screen now (the layout isn't locked). */
+    val canArrange: Boolean get() = writer.canArrange
 
     init {
         viewModelScope.launch {
@@ -179,21 +182,19 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 // Collected through stacks too: missing a nested widget here would delete it on every start.
                 appWidgets.orphanIds(saved.usedAppWidgetIds()).forEach(appWidgets::deleteId)
             }
-            // Keep the layout in sync with installed apps, hidden apps and the grid size.
-            combine(repository.apps, settings.state) { apps, prefs -> apps to prefs }.collect { (apps, prefs) ->
-                if (apps.isEmpty()) return@collect
-                val visible = apps.filter { it.key !in prefs.hiddenApps }
-                val capacity = Tokens.GridColumns * prefs.gridRows
-                val base = layout.value ?: store.initialLayout(visible, capacity)
-                val next = base.reconcile(visible.map { it.key }, capacity, prefs.dockSlots)
+            // Keep the layout in sync with installed apps, hidden apps and the dock size. Not a
+            // user arrangement, so it goes on while the layout is locked. The grid is the
+            // layout's own and changes only through LayoutRepository.changeGrid.
+            combine(repository.snapshot, settings.state) { apps, prefs -> apps to prefs }.collect { (snapshot, prefs) ->
+                if (snapshot.apps.isEmpty()) return@collect
+                val base = layout.value ?: store.initialLayout(visibleApps(snapshot.apps, prefs))
+                val next = base.syncedWith(snapshot, prefs)
                     // A widget's app was uninstalled: its widget goes too.
-                    .withoutDeadAppWidgets(appWidgets::isAlive, capacity, prefs.dockSlots)
-                if (next != layout.value) update(next)
+                    .withoutDeadAppWidgets(appWidgets::isAlive, prefs.dockSlots)
+                if (next != layout.value) layoutRepository.update(next)
             }
         }
     }
-
-    private fun update(next: LayoutData) = layoutRepository.update(next)
 
     // region Drag and drop
 
@@ -202,13 +203,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
      * New folders are named after the category of the app they were created on.
      */
     fun drop(id: String, position: DropPosition) {
-        val current = layout.value ?: return
-        val item = findItem(current, id) ?: return
-        val next = current.move(item, position, pageCapacity, dockCapacity) {
-            val target = (position as? DropPosition.Merge)?.targetId
-            store.folderNameFor(repository.apps.value.firstOrNull { it.key == target })
+        writer.arrange { current ->
+            val item = findItem(current, id) ?: return@arrange current
+            current.move(item, position, dockCapacity) {
+                val target = (position as? DropPosition.Merge)?.targetId
+                store.folderNameFor(repository.apps.value.firstOrNull { it.key == target })
+            }
         }
-        if (next != current) update(next)
     }
 
     private fun findItem(layout: LayoutData, id: String): HomeItem? =
@@ -219,26 +220,28 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     // region Edit mode, menus, folders
 
-    fun enterEditMode() {
+    /** iOS "jiggle mode"; false (and nothing happens) while the layout is locked. */
+    fun enterEditMode(): Boolean {
         closeMenu()
+        if (!canArrange) return false
         editMode.value = true
+        return true
     }
 
     fun exitEditMode() {
         editMode.value = false
     }
 
-    fun openMenu(entry: HomeEntry, bounds: Rect, inDock: Boolean) {
+    fun openMenu(entry: HomeEntry, bounds: Rect, inDock: Boolean, inLibrary: Boolean = false) {
         val shortcuts = (entry as? AppEntry)?.let { repository.shortcuts(it.app) }.orEmpty()
         val onHome = entry !is AppEntry || layout.value?.allAppKeys()?.contains(entry.id) != false
-        menu.value = MenuTarget(entry, bounds, inDock, shortcuts, onHome)
+        menu.value = MenuTarget(entry, bounds, inDock, shortcuts, onHome, inLibrary)
     }
 
     /** "Add to Home Screen" from the App Library: the app goes to the end of the last page. */
     fun addToHome(app: AppInfo) {
         closeMenu()
-        val current = layout.value ?: return
-        update(current.addToHome(app.key, pageCapacity, dockCapacity))
+        writer.arrange { it.addToHome(app.key, dockCapacity) }
     }
 
     fun openSearch(mode: SearchMode) {
@@ -256,8 +259,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openFolder(id: String, bounds: Rect, renaming: Boolean = false) {
         closeMenu()
-        if (renaming) editMode.value = true
-        openFolder.value = OpenFolder(id, bounds, renaming)
+        val rename = renaming && canArrange
+        if (rename) editMode.value = true
+        openFolder.value = OpenFolder(id, bounds, rename)
     }
 
     fun closeFolder() {
@@ -265,10 +269,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun renameFolder(id: String, name: String) {
-        val current = layout.value ?: return
         val trimmed = name.trim()
-        if (trimmed.isEmpty() || current.findFolder(id)?.name == trimmed) return
-        update(current.renameFolder(id, trimmed))
+        if (trimmed.isEmpty()) return
+        writer.arrange { it.renameFolder(id, trimmed) }
     }
 
     /** Menu action: put the item in the dock, or send it from the dock to the last page. */
@@ -284,15 +287,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** "Remove from Home Screen": the app stays installed but is no longer on the Home Screen. */
     fun removeFromHome(app: AppInfo) {
         removeRequest.value = null
-        val current = layout.value ?: return
-        update(current.removeFromHome(app.key, pageCapacity, dockCapacity))
+        writer.arrange { it.removeFromHome(app.key, dockCapacity) }
     }
 
-    /** "Hide App": hidden everywhere until shown again in Settings → Hidden Apps. */
+    /**
+     * "Hide App": hidden everywhere until shown again in Settings → Hidden Apps. It takes the
+     * app off the Home Screen, so the home menu doesn't offer it while the layout is locked.
+     */
     fun hideApp(app: AppInfo) {
         closeMenu()
         removeRequest.value = null
-        settings.setAppHidden(app.key, hidden = true)
+        if (canArrange) settings.setAppHidden(app.key, hidden = true)
     }
 
     // endregion
@@ -301,7 +306,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openWidgetGallery() {
         closeMenu()
-        widgetGallery.value = true
+        if (canArrange) widgetGallery.value = true
     }
 
     fun closeWidgetGallery() {
@@ -311,54 +316,56 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Adds a Smart Stack of the built-in widgets of [size] (see [smartStack]). */
     fun addSmartStack(size: WidgetSize, target: WidgetTarget) {
         closeWidgetGallery()
-        val current = layout.value ?: return
-        update(current.addWidget(smartStack("stack-${System.currentTimeMillis()}", size), target, pageCapacity, dockCapacity))
+        writer.arrange { it.addWidget(smartStack("stack-${System.currentTimeMillis()}", size), target, dockCapacity) }
         refreshWidgets()
     }
 
     /** Adds a widget at the top of a home page or at the end of the Today page. */
     fun addWidget(kind: WidgetKind, size: WidgetSize, target: WidgetTarget) {
         closeWidgetGallery()
-        val current = layout.value ?: return
         val widget = WidgetItem("widget-${System.currentTimeMillis()}", kind, size)
-        update(current.addWidget(widget, target, pageCapacity, dockCapacity))
+        writer.arrange { it.addWidget(widget, target, dockCapacity) }
         refreshWidgets()
     }
 
-    /** Another app's widget was bound (and configured): place it with the size it asks for. */
+    /**
+     * Another app's widget was bound (and configured): place it with the size it asks for.
+     * When it can't be placed (the layout got locked meanwhile, or it is bigger than the
+     * grid), its id is freed instead of keeping a widget nobody sees.
+     */
     fun addAppWidget(appWidgetId: Int, info: AppWidgetProviderInfo, target: WidgetTarget) {
         closeWidgetGallery()
-        val current = layout.value ?: return appWidgets.deleteId(appWidgetId)
         val widget = AppWidgetItem("appwidget-$appWidgetId", appWidgetId, info.provider.flattenToString(), appWidgets.defaultSpan(info))
-        update(current.addWidget(widget, target, pageCapacity, dockCapacity))
+        val placed = writer.arrange { it.addWidget(widget, target, dockCapacity) }
+        if (!placed) appWidgets.deleteId(appWidgetId)
     }
 
     /** New size in cells; built-in widgets only take their own sizes, a stack only one all its widgets take. */
     fun resizeWidget(id: String, span: Span) {
         closeMenu()
-        val current = layout.value ?: return
-        val resized = when (val widget = current.findWidget(id)) {
-            is WidgetItem -> widget.kind.sizes.firstOrNull { it.span == span }?.let { widget.copy(size = it) }
-            is AppWidgetItem -> widget.copy(span = span)
-            is WidgetStack -> WidgetSize.entries.firstOrNull { it.span == span }?.let { widget.resizedTo(it, ::supportsSize) }
-            null -> null
-        } ?: return
-        update(current.updateWidget(resized, pageCapacity, dockCapacity))
+        writer.arrange { current ->
+            val resized = when (val widget = current.findWidget(id)) {
+                is WidgetItem -> widget.kind.sizes.firstOrNull { it.span == span }?.let { widget.copy(size = it) }
+                is AppWidgetItem -> widget.copy(span = span)
+                is WidgetStack -> WidgetSize.entries.firstOrNull { it.span == span }?.let { widget.resizedTo(it, ::supportsSize) }
+                null -> null
+            } ?: return@arrange current
+            current.updateWidget(resized, dockCapacity)
+        }
     }
 
     /** Whether [widget] can take [size] (a built-in size, or one the hosted widget allows). */
     fun supportsSize(widget: PageWidget, size: WidgetSize): Boolean = when (widget) {
         is WidgetItem -> size in widget.kind.sizes
-        is AppWidgetItem -> appWidgets.info(widget.appWidgetId)?.let(appWidgets::spans)?.contains(size.span) == true
+        is AppWidgetItem -> appWidgets.info(widget.appWidgetId)?.let { appWidgets.spans(it, state.value.grid) }?.contains(size.span) == true
         is WidgetStack -> widget.items.all { supportsSize(it, size) }
     }
 
     fun removeWidget(id: String) {
         closeMenu()
-        val current = layout.value ?: return
-        val widget = current.findWidget(id)
-        update(current.removeWidget(id, pageCapacity, dockCapacity))
-        widget?.let(::releaseWidget)
+        val widget = layout.value?.findWidget(id)
+        // Its photo or hosted id is freed only once it is really gone from the layout.
+        if (writer.arrange { it.removeWidget(id, dockCapacity) }) widget?.let(::releaseWidget)
     }
 
     /** Frees what a removed widget held: its photo file or hosted widget id; a stack frees all of its widgets. */
@@ -370,16 +377,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** App Library state and actions; each action is one settings change and one save. */
+    val library: LibraryActions =
+        LibraryActions(viewModelScope, settings, repository.snapshot, visibleApps, launchStats.scores, ::closeMenu)
+
     /** Smart Stack actions; each is one layout change and one save. */
-    val stacks: StackActions = StackActions(layout, ::update, { pageCapacity }, { dockCapacity }, ::releaseWidget, ::closeMenu)
+    val stacks: StackActions = StackActions(layout, writer, { dockCapacity }, ::releaseWidget, ::closeMenu)
 
     /** Stores the picked image for a photo widget and shows it. */
     fun setWidgetPhoto(id: String, image: Uri) {
         viewModelScope.launch {
             if (!WidgetPhotos.import(getApplication(), id, image)) return@launch
-            val current = layout.value ?: return@launch
-            val widget = current.findWidget(id) as? WidgetItem ?: return@launch
-            update(current.updateWidget(widget.copy(photo = System.currentTimeMillis()), pageCapacity, dockCapacity))
+            // A new picture in a placed widget doesn't move anything, so a locked layout allows it.
+            writer.sync { current ->
+                val widget = current.findWidget(id) as? WidgetItem ?: return@sync current
+                current.updateWidget(widget.copy(photo = System.currentTimeMillis()), dockCapacity)
+            }
         }
     }
 

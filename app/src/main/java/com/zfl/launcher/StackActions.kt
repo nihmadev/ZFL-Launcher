@@ -14,12 +14,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Smart Stack actions of the home screen. Every user action is one layout change through
- * the repository ([update]), so one save; swiping saves only once the stack settles.
+ * [writer], so one save; swiping saves only once the stack settles. Reordering, removing and
+ * taking widgets out rearrange the screen and stop while the layout is locked; swiping
+ * through a stack only remembers which widget is shown, so it always works.
  */
 class StackActions internal constructor(
     private val layout: StateFlow<LayoutData?>,
-    private val update: (LayoutData) -> Unit,
-    private val pageCapacity: () -> Int,
+    private val writer: LayoutWriter,
     private val dockCapacity: () -> Int,
     private val release: (PageWidget) -> Unit,
     private val closeMenu: () -> Unit,
@@ -29,7 +30,7 @@ class StackActions internal constructor(
 
     fun openEditor(id: String) {
         closeMenu()
-        editing.value = id
+        if (writer.canArrange) editing.value = id
     }
 
     fun closeEditor() {
@@ -37,29 +38,28 @@ class StackActions internal constructor(
     }
 
     /** The user swiped stack [id] to the widget at [index]. */
-    fun show(id: String, index: Int) = change(id) { it.showing(index) }
+    fun show(id: String, index: Int) {
+        writer.sync { it.updateStack(id, dockCapacity()) { stack -> stack.showing(index) } }
+    }
 
-    fun move(id: String, from: Int, to: Int) = change(id) { it.moved(from, to) }
+    fun move(id: String, from: Int, to: Int) {
+        change(id) { it.moved(from, to) }
+    }
 
     /** Removes widget [itemId] from the stack and frees it (a stack left with one widget becomes it). */
     fun remove(id: String, itemId: String) {
         val item = layout.value?.findStack(id)?.items?.firstOrNull { it.id == itemId } ?: return
-        change(id) { it.minus(itemId) }
+        if (!change(id) { it.minus(itemId) }) return
         release(item)
         if (layout.value?.findStack(id) == null) closeEditor()
     }
 
     /** Puts widget [itemId] on the page next to the stack. */
     fun takeOut(id: String, itemId: String) {
-        val current = layout.value ?: return
-        val next = current.takeOutOfStack(id, itemId, pageCapacity(), dockCapacity())
-        if (next != current) update(next)
-        if (next.findStack(id) == null) closeEditor()
+        writer.arrange { it.takeOutOfStack(id, itemId, dockCapacity()) }
+        if (layout.value?.findStack(id) == null) closeEditor()
     }
 
-    private fun change(id: String, transform: (WidgetStack) -> WidgetStack) {
-        val current = layout.value ?: return
-        val next = current.updateStack(id, pageCapacity(), dockCapacity(), transform)
-        if (next != current) update(next)
-    }
+    private fun change(id: String, transform: (WidgetStack) -> WidgetStack): Boolean =
+        writer.arrange { it.updateStack(id, dockCapacity(), transform) }
 }
