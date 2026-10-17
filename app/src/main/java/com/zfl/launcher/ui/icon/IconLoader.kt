@@ -80,6 +80,12 @@ class IconLoader(
     /** Tint the "from wallpaper" option gives at [saturation]; `null` while the wallpaper colors are loading. */
     fun wallpaperTint(saturation: Float): Int? = wallpaper?.let { tintColor(it.color ?: DEFAULT_ICON_TINT, saturation) }
 
+    /** Main color of the wallpaper (ARGB); `null` while loading or when it has none. Snapshot state. */
+    val wallpaperColor: Int? get() = wallpaper?.color
+
+    /** Style of the icons drawn now; `null` while it waits for the wallpaper colors. Snapshot state. */
+    val iconStyle: IconStyle? get() = spec?.style
+
     private val colorsListener = WallpaperManager.OnColorsChangedListener { colors: WallpaperColors?, which: Int ->
         if (which and WallpaperManager.FLAG_SYSTEM != 0) setWallpaper(colors)
     }
