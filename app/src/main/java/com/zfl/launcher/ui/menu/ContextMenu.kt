@@ -85,6 +85,7 @@ import com.zfl.launcher.data.PlaceholderEntry
 import com.zfl.launcher.data.AppRepository
 import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.settings.MenuAction
+import com.zfl.launcher.settings.SettingsState
 import com.zfl.launcher.ui.home.LauncherActions
 import com.zfl.launcher.ui.home.FolderIcon
 import com.zfl.launcher.ui.icon.AppIconImage
@@ -95,22 +96,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import com.zfl.launcher.ui.theme.Motion
-
-/** What is drawn on the left side of a menu row. */
-private sealed interface MenuIcon {
-    data class Vector(val image: ImageVector) : MenuIcon
-    data class Shortcut(val shortcut: ShortcutInfo) : MenuIcon
-    data object MinusCircle : MenuIcon
-}
-
-/** One row of the menu. */
-private data class MenuItem(
-    val label: String,
-    val icon: MenuIcon,
-    val destructive: Boolean = false,
-    val enabled: Boolean = true,
-    val onClick: () -> Unit,
-)
 
 /**
  * iOS-style long-press menu.
@@ -131,6 +116,7 @@ fun ContextMenuOverlay(
     onEditHome: () -> Unit,
     onRenameFolder: (FolderEntry, Rect) -> Unit,
     onAddToHome: (AppInfo) -> Unit,
+    library: LibraryMenuActions,
     widgetActions: WidgetMenuActions,
     actions: LauncherActions,
 ) {
@@ -150,9 +136,9 @@ fun ContextMenuOverlay(
     val settings = LocalSettingsState.current
     val widget = current.entry as? PageWidgetEntry
     val entries = if (widget != null) {
-        widgetEntries(widget, settings.hiddenMenuActions, onEditHome, widgetActions)
+        widgetEntries(widget, settings.hiddenMenuActions, settings.layoutLocked, onEditHome, widgetActions)
     } else {
-        buildEntries(current, settings.hiddenMenuActions, dockIsFull, onDismiss, onToggleDock, onHide, onEditHome, onRenameFolder, onAddToHome, actions)
+        buildEntries(current, settings, dockIsFull, onDismiss, onToggleDock, onHide, onEditHome, onRenameFolder, onAddToHome, library, actions)
     }
 
     BoxWithConstraints(
@@ -200,7 +186,7 @@ fun ContextMenuOverlay(
                 MenuCard(
                     entries = if (above) entries.asReversed() else entries,
                     repository = repository,
-                    header = widget?.let { w -> widgetActions.sizes(w).takeIf { it.size > 1 } }?.let { sizes ->
+                    header = widget?.takeIf { !settings.layoutLocked }?.let { w -> widgetActions.sizes(w).takeIf { it.size > 1 } }?.let { sizes ->
                         {
                             WidgetSizeRow(widget, sizes, available = { widgetActions.isSizeAvailable(widget, it) }) { span ->
                                 widgetActions.resize(widget.id, span)
@@ -228,71 +214,6 @@ fun ContextMenuOverlay(
             val y = (if (above) bounds.top - gapPx - card.height else bounds.bottom + gapPx).roundToInt()
                 .coerceIn(margin, (constraints.maxHeight - card.height - margin).coerceAtLeast(margin))
             layout(constraints.maxWidth, constraints.maxHeight) { card.place(x, y) }
-        }
-    }
-}
-
-@Composable
-private fun buildEntries(
-    target: MenuTarget,
-    hidden: Set<MenuAction>,
-    dockIsFull: Boolean,
-    onDismiss: () -> Unit,
-    onToggleDock: (HomeEntry) -> Unit,
-    onHide: (AppInfo) -> Unit,
-    onEditHome: () -> Unit,
-    onRenameFolder: (FolderEntry, Rect) -> Unit,
-    onAddToHome: (AppInfo) -> Unit,
-    actions: LauncherActions,
-): List<MenuItem> {
-    val entry = target.entry
-    val folder = entry as? FolderEntry
-    val app = (entry as? AppEntry)?.app
-    if (folder == null && app == null) return emptyList()
-    return menuActionsFor(isFolder = folder != null, onHome = target.onHome, hidden = hidden).flatMap { action ->
-        when (action) {
-            MenuAction.Shortcuts -> target.shortcuts.map { shortcut ->
-                MenuItem(
-                    label = (shortcut.shortLabel ?: shortcut.longLabel ?: "").toString(),
-                    icon = MenuIcon.Shortcut(shortcut),
-                    onClick = { onDismiss(); actions.launchShortcut(shortcut, target.iconBounds) },
-                )
-            }
-            MenuAction.RenameFolder -> listOf(
-                MenuItem(stringResource(R.string.menu_rename_folder), MenuIcon.Vector(Icons.Outlined.Edit)) {
-                    onRenameFolder(folder!!, target.iconBounds)
-                },
-            )
-            MenuAction.AddToHome -> listOf(
-                MenuItem(stringResource(R.string.menu_add_to_home), MenuIcon.Vector(Icons.Outlined.AddBox)) { onAddToHome(app!!) },
-            )
-            MenuAction.AppInfo -> listOf(
-                MenuItem(stringResource(R.string.menu_app_info), MenuIcon.Vector(Icons.Outlined.Info)) {
-                    onDismiss(); actions.openAppInfo(app!!)
-                },
-            )
-            MenuAction.Dock -> listOf(
-                when {
-                    target.inDock -> MenuItem(stringResource(R.string.menu_remove_from_dock), MenuIcon.Vector(Icons.Outlined.Close)) {
-                        onToggleDock(entry)
-                    }
-                    dockIsFull -> MenuItem(stringResource(R.string.menu_dock_full), MenuIcon.Vector(Icons.Outlined.Star), enabled = false) {}
-                    else -> MenuItem(stringResource(R.string.menu_add_to_dock), MenuIcon.Vector(Icons.Outlined.Star)) {
-                        onToggleDock(entry)
-                    }
-                },
-            )
-            MenuAction.HideApp -> listOf(
-                MenuItem(stringResource(R.string.menu_hide_app), MenuIcon.Vector(Icons.Outlined.VisibilityOff)) { onHide(app!!) },
-            )
-            MenuAction.EditHome -> listOf(
-                MenuItem(stringResource(R.string.menu_edit_home), MenuIcon.Vector(Icons.Outlined.Apps)) { onEditHome() },
-            )
-            MenuAction.RemoveApp -> listOf(
-                MenuItem(stringResource(R.string.menu_remove_app), MenuIcon.MinusCircle, destructive = true) {
-                    onDismiss(); actions.uninstall(app!!)
-                },
-            )
         }
     }
 }
@@ -334,25 +255,6 @@ interface WidgetMenuActions {
     fun remove(id: String)
     fun pickPhoto(id: String)
     fun editStack(id: String)
-}
-
-@Composable
-private fun widgetEntries(widget: PageWidgetEntry, hidden: Set<MenuAction>, onEditHome: () -> Unit, actions: WidgetMenuActions): List<MenuItem> {
-    val stack = widget as? WidgetStackEntry
-    // In a stack, the photo choice applies to the widget being shown.
-    val shown = stack?.currentItem ?: widget
-    return listOfNotNull(
-        MenuItem(stringResource(R.string.stack_edit), MenuIcon.Vector(Icons.Outlined.Layers)) { actions.editStack(widget.id) }
-            .takeIf { stack != null },
-        MenuItem(stringResource(R.string.widget_choose_photo), MenuIcon.Vector(Icons.Outlined.Image)) {
-            actions.pickPhoto(shown.id)
-        }.takeIf { shown is WidgetEntry && shown.kind == WidgetKind.Photo },
-        MenuItem(stringResource(R.string.menu_edit_home), MenuIcon.Vector(Icons.Outlined.Apps)) { onEditHome() }
-            .takeIf { MenuAction.EditHome !in hidden },
-        MenuItem(stringResource(if (stack != null) R.string.stack_remove else R.string.widget_remove), MenuIcon.MinusCircle, destructive = true) {
-            actions.remove(widget.id)
-        },
-    )
 }
 
 /** One button per size; the current one is highlighted, unavailable ones are dimmed. */

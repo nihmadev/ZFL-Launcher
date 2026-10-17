@@ -40,4 +40,19 @@ class MenuActionsTest {
             menuActionsFor(isFolder = true, onHome = true, hidden = setOf(MenuAction.Dock, MenuAction.AppInfo)),
         )
     }
+
+    @Test
+    fun libraryMenuAddsPinAndCategoryEvenWhenLocked() {
+        val actions = menuActionsFor(isFolder = false, onHome = false, hidden = emptySet(), locked = true, inLibrary = true)
+        assertEquals(
+            listOf(MenuAction.Shortcuts, MenuAction.LibraryPin, MenuAction.LibraryCategory, MenuAction.AppInfo, MenuAction.RemoveApp),
+            actions,
+        )
+        assertEquals(false, MenuAction.LibraryPin in menuActionsFor(isFolder = false, onHome = true, hidden = emptySet()))
+        assertEquals(false, MenuAction.LibraryPin in menuActionsFor(isFolder = true, onHome = true, hidden = emptySet(), inLibrary = true))
+        assertEquals(
+            false,
+            MenuAction.LibraryCategory in menuActionsFor(false, false, setOf(MenuAction.LibraryCategory), inLibrary = true),
+        )
+    }
 }
