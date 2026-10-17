@@ -165,6 +165,7 @@ class MainActivity : ComponentActivity(), LauncherActions {
 
     /** True after another activity covered the home screen; used for the resume animation. */
     private var leftHome = false
+    private val homeIntents = HomeIntentRouter()
 
     override fun onResume() {
         super.onResume()
@@ -176,6 +177,7 @@ class MainActivity : ComponentActivity(), LauncherActions {
         // Cheap when nothing changed; also picks up a freshly granted file access permission.
         vm.refreshWallpaper()
         vm.refreshWidgets()
+        if (homeIntents.resume()) vm.returnToHome.tryEmit(Unit)
         if (leftHome) {
             leftHome = false
             vm.returnedHome.tryEmit(Unit)
@@ -192,6 +194,7 @@ class MainActivity : ComponentActivity(), LauncherActions {
         super.onStop()
         vm.appWidgets.stopListening()
         leftHome = true
+        homeIntents.stop()
     }
 
     private fun applyStatusBarVisibility(hidden: Boolean) {
@@ -217,8 +220,7 @@ class MainActivity : ComponentActivity(), LauncherActions {
         // returning from an app keeps the page you left. The activity is paused during
         // onNewIntent, so the lifecycle can't tell us that; window focus can (same as Launcher3).
         val broughtToFront = intent.flags and Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT != 0
-        if (isHome && hasWindowFocus() && !broughtToFront) {
-            vm.closeMenu()
+        if (homeIntents.intent(isHome, hasWindowFocus(), broughtToFront)) {
             vm.homePressed.tryEmit(Unit)
         }
     }
@@ -236,10 +238,15 @@ class MainActivity : ComponentActivity(), LauncherActions {
 
     // region LauncherActions
 
+    private fun openExternal(intent: Intent): Result<Unit> = runCatching {
+        startActivity(intent)
+        homeIntents.appLaunched()
+    }
+
     override fun webSearch(query: String) {
         val intent = Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, query)
-        runCatching { startActivity(intent) }
-            .onFailure { runCatching { startActivity(Intent(Intent.ACTION_VIEW, ("https://duckduckgo.com/?q=" + Uri.encode(query)).toUri())) } }
+        openExternal(intent)
+            .onFailure { openExternal(Intent(Intent.ACTION_VIEW, ("https://duckduckgo.com/?q=" + Uri.encode(query)).toUri())) }
     }
 
     override fun launch(app: AppInfo, bounds: Rect) {
@@ -253,11 +260,16 @@ class MainActivity : ComponentActivity(), LauncherActions {
         } else {
             ActivityOptions.makeCustomAnimation(this, 0, 0).toBundle()
         }
-        runCatching { launcherApps.startMainActivity(app.component, app.user, source, options) }
+        runCatching {
+            if (launcherApps.isActivityEnabled(app.component, app.user)) {
+                launcherApps.startMainActivity(app.component, app.user, source, options)
+                if (app.packageName != packageName) homeIntents.appLaunched()
+            }
+        }
     }
 
     override fun launchShortcut(shortcut: ShortcutInfo, bounds: Rect) {
-        runCatching { launcherApps.startShortcut(shortcut, bounds.toAndroidRect(), null) }
+        runCatching { launcherApps.startShortcut(shortcut, bounds.toAndroidRect(), null) }.onSuccess { homeIntents.appLaunched() }
     }
 
     override fun openAppInfo(app: AppInfo) {
@@ -287,14 +299,14 @@ class MainActivity : ComponentActivity(), LauncherActions {
         // so find the clock app that handles it and start it like from its icon.
         val clockPackage = packageManager.resolveActivity(Intent(AlarmClock.ACTION_SHOW_ALARMS), 0)?.activityInfo?.packageName
         val launch = clockPackage?.let { packageManager.getLaunchIntentForPackage(it) } ?: return
-        runCatching { startActivity(launch) }
+        openExternal(launch)
     }
 
     override fun openCalendar() {
         // The system calendar's "today" view, whichever calendar app handles it.
         val today = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
             .also { ContentUris.appendId(it, System.currentTimeMillis()) }.build()
-        runCatching { startActivity(Intent(Intent.ACTION_VIEW, today)) }
+        openExternal(Intent(Intent.ACTION_VIEW, today))
     }
 
     override fun requestCalendarPermission() {

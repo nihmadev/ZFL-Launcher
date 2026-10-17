@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -23,9 +24,10 @@ import com.zfl.launcher.LauncherViewModel
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.data.FolderEntry
 import com.zfl.launcher.data.HomeState
-import com.zfl.launcher.data.LibraryCategory
+import com.zfl.launcher.data.AppLibraryState
 import com.zfl.launcher.data.WidgetKind
 import com.zfl.launcher.data.WidgetSize
+import com.zfl.launcher.ui.library.CategoryChooser
 import com.zfl.launcher.ui.library.CategoryOverlay
 import com.zfl.launcher.ui.library.LibraryCallbacks
 import com.zfl.launcher.ui.menu.ContextMenuOverlay
@@ -46,7 +48,7 @@ internal fun HomeOverlays(
     actions: LauncherActions,
     state: HomeState,
     drag: DragController,
-    library: List<LibraryCategory>,
+    library: AppLibraryState?,
     visibleApps: List<AppInfo>,
     folderIcons: HomeIconCallbacks,
     libraryCallbacks: LibraryCallbacks,
@@ -61,7 +63,8 @@ internal fun HomeOverlays(
     val openFolder by vm.openFolder.collectAsStateWithLifecycle()
     val removeRequest by vm.removeRequest.collectAsStateWithLifecycle()
     val search by vm.search.collectAsStateWithLifecycle()
-    val openCategoryId by vm.openCategory.collectAsStateWithLifecycle()
+    val openGroupId by vm.library.openGroup.collectAsStateWithLifecycle()
+    val chooserApp by vm.library.choosingCategory.collectAsStateWithLifecycle()
     val gallery by vm.widgetGallery.collectAsStateWithLifecycle()
     val editingStack by vm.stacks.editing.collectAsStateWithLifecycle()
 
@@ -91,11 +94,11 @@ internal fun HomeOverlays(
         onRename = vm::renameFolder,
     )
 
-    CategoryOverlay(
-        category = library.firstOrNull { it.id == openCategoryId },
-        callbacks = libraryCallbacks,
-        onClose = { vm.openCategory.value = null },
-    )
+    // Looked up by id each time: a rename shows at once; a group that was deleted or lost its
+    // last app (hidden, uninstalled) closes.
+    val openGroup = openGroupId?.let { id -> library?.cards?.firstOrNull { it.id == id } }
+    if (openGroupId != null && library != null && openGroup == null) LaunchedEffect(openGroupId) { vm.library.close() }
+    CategoryOverlay(group = openGroup, callbacks = libraryCallbacks, onClose = vm.library::close)
 
     SearchOverlay(
         mode = search,
@@ -127,8 +130,16 @@ internal fun HomeOverlays(
         onEditHome = vm::enterEditMode,
         onRenameFolder = { entry, bounds -> vm.openFolder(entry.id, bounds, renaming = true) },
         onAddToHome = vm::addToHome,
+        library = remember(vm) { libraryMenuActions(vm) },
         widgetActions = widgetMenu,
         actions = actions,
+    )
+
+    CategoryChooser(
+        app = chooserApp,
+        library = library,
+        onAssign = vm.library::assign,
+        onDismiss = vm.library::closeCategoryChooser,
     )
 
     StackEditor(

@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.launcherHaptics
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -39,7 +39,6 @@ import com.zfl.launcher.ui.widgets.AppWidgets
 import com.zfl.launcher.ui.widgets.PageWidgetBody
 import androidx.compose.ui.platform.LocalContext
 import com.zfl.launcher.data.WidgetSize
-import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.widgets.WidgetBody
 import com.zfl.launcher.ui.widgets.titleRes
@@ -84,6 +83,7 @@ val PageWidgetEntry.isSquare: Boolean get() = this is WidgetEntry && size == Wid
  * shows the widget menu (another app's widget handles its own taps; the long press comes
  * from its host view). Edit mode: it jiggles, gets a "−" badge and drags on touch.
  *
+ * @param slot icon size and names of the area: the card lines up with the icons around it.
  * @param withLabel show the widget's name under it, like home screen widgets in iOS27L.
  * @param draggable edit-mode dragging (home pages only; Today is arranged from the menu).
  * @param mergeTarget a widget of the same size hovers over this one and will make (or join) a stack.
@@ -91,6 +91,7 @@ val PageWidgetEntry.isSquare: Boolean get() = this is WidgetEntry && size == Wid
 @Composable
 fun HomeWidget(
     entry: PageWidgetEntry,
+    slot: IconSlot,
     editMode: Boolean,
     jiggleSeed: Int,
     callbacks: WidgetCallbacks,
@@ -101,12 +102,11 @@ fun HomeWidget(
     hidden: Boolean = false,
     mergeTarget: Boolean = false,
 ) {
-    val settings = LocalSettingsState.current
-    val haptic = LocalHapticFeedback.current
+    val haptic = launcherHaptics()
     var bounds by remember { mutableStateOf(Rect.Zero) }
     val currentEntry by rememberUpdatedState(entry)
     val currentCallbacks by rememberUpdatedState(callbacks)
-    val showLabel = withLabel && settings.showLabels
+    val showLabel = withLabel && slot.showLabel
 
     val gestures = if (editMode) {
         Modifier.pointerInput(true, draggable) {
@@ -140,7 +140,7 @@ fun HomeWidget(
     }
 
     BoxWithConstraints(modifier, contentAlignment = Alignment.TopCenter) {
-        val body = widgetBodySize(DpSize(maxWidth, maxHeight), entry.span, entry.isSquare, settings.iconSize, showLabel, slotInset)
+        val body = widgetBodySize(DpSize(maxWidth, maxHeight), entry.span, entry.isSquare, slot.iconSize, showLabel, slotInset)
         Column(
             Modifier
                 .graphicsLayer { alpha = if (hidden) 0f else 1f }
@@ -180,7 +180,7 @@ fun HomeWidget(
             }
             if (showLabel) {
                 LabelSpacer()
-                IconLabel(widgetLabel(entry))
+                IconLabel(widgetLabel(entry), scale = slot.labelScale)
             }
         }
     }

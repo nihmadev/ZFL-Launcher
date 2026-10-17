@@ -20,6 +20,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -32,8 +33,13 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.LayoutDirection
+import com.zfl.launcher.settings.IconArea
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zfl.launcher.LauncherViewModel
@@ -42,13 +48,14 @@ import com.zfl.launcher.data.WidgetTarget
 import com.zfl.launcher.ui.widgets.LocalWidgetEnvironment
 import com.zfl.launcher.SearchMode
 import com.zfl.launcher.data.AppInfo
+import com.zfl.launcher.data.libraryTitles
 import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.settings.SettingsState
 import com.zfl.launcher.ui.glass.LocalGlassSource
 import com.zfl.launcher.ui.library.AppLibraryPage
 import com.zfl.launcher.ui.theme.Motion
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.launcherHaptics
 import com.zfl.launcher.ui.theme.Haptics
 
 /** Actions that need an Activity: launching apps and opening system screens. */
@@ -74,10 +81,6 @@ interface LauncherActions {
     fun addAppWidget(info: AppWidgetProviderInfo, target: WidgetTarget)
 }
 
-/** Pager index of the Today page; the home pages start right after it. */
-internal const val TODAY_PAGE: Int = 0
-internal const val FIRST_HOME_PAGE: Int = 1
-
 /**
  * Root of the launcher UI: swipeable pages, the page pill, the glass dock, and the layers
  * above them (edit bar, open folder, long-press menu, the icon being dragged).
@@ -93,26 +96,32 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     val search by vm.search.collectAsStateWithLifecycle()
     val gallery by vm.widgetGallery.collectAsStateWithLifecycle()
     val widgetEnvironment by vm.widgetEnvironment.collectAsStateWithLifecycle()
-    val library by vm.library.collectAsStateWithLifecycle()
-    val openCategoryId by vm.openCategory.collectAsStateWithLifecycle()
+    val library by vm.library.state.collectAsStateWithLifecycle()
+    val openGroupId by vm.library.openGroup.collectAsStateWithLifecycle()
+    val chooserApp by vm.library.choosingCategory.collectAsStateWithLifecycle()
     val visibleApps by vm.visibleApps.collectAsStateWithLifecycle()
     val settings = LocalSettingsState.current
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
+    // Group names follow the UI language; read from the Activity so the in-app language applies.
+    val context = LocalContext.current
+    val locale = LocalConfiguration.current.locales[0]
+    LaunchedEffect(locale) { vm.library.titles.value = libraryTitles(context) }
 
-    val pageCount = remember { mutableIntStateOf(FIRST_HOME_PAGE + state.pages.size) }
-    val pager = rememberPagerState(initialPage = FIRST_HOME_PAGE) { pageCount.intValue }
+    val pagerMap = remember { androidx.compose.runtime.mutableStateOf(HomePages(state.pages.size, settings.homeBehavior.showToday, settings.appLibrary)) }
+    val pager = rememberPagerState(initialPage = pagerMap.value.main(settings.homeBehavior.mainPage)) { pagerMap.value.count }
+    var pagerInitialized by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     val drag = remember {
         DragController(
             scope = scope,
             slopPx = with(density) { 10.dp.toPx() },
             edgePx = with(density) { 28.dp.toPx() },
-            callbacks = HomeDragCallbacks(vm, scope, pager, FIRST_HOME_PAGE),
+            callbacks = HomeDragCallbacks(vm, scope, pager) { pagerMap.value.firstHome },
         )
     }
 
     // A tick when a dragged item is about to make (or join) a folder or a stack.
-    val haptic = LocalHapticFeedback.current
+    val haptic = launcherHaptics()
     LaunchedEffect(drag) {
         snapshotFlow { drag.mergeArmed }.collect { armed -> if (armed) haptic.performHapticFeedback(Haptics.Tick) }
     }
@@ -120,15 +129,38 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     // While dragging, show the layout with a gap where the item would land.
     val pages = if (drag.isDragging) drag.previewPages() else state.pages
     val dock = if (drag.isDragging) drag.previewDock() else state.dock
-    val windowWidth = LocalWindowInfo.current.containerSize.width.toFloat()
-    // Today, then the Home Screen pages, then the App Library (-1 when it is turned off).
-    val libraryPage = if (settings.appLibrary) FIRST_HOME_PAGE + pages.size else -1
+    val pageMap = HomePages(pages.size, settings.homeBehavior.showToday, settings.appLibrary)
     SideEffect {
-        pageCount.intValue = FIRST_HOME_PAGE + pages.size + if (settings.appLibrary) 1 else 0
+        val previous = pagerMap.value
+        when {
+            !pagerInitialized && vm.homeLoaded -> {
+                pager.requestScrollToPage(pageMap.main(settings.homeBehavior.mainPage))
+                pagerInitialized = true
+            }
+            previous != pageMap -> pager.requestScrollToPage(pageMap.position(previous.page(pager.currentPage), settings.homeBehavior.mainPage))
+        }
+        pagerMap.value = pageMap
+    }
+    val windowWidth = LocalWindowInfo.current.containerSize.width.toFloat()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    // Each area resolves its own icon size and names; the pages leave room for the dock it measures.
+    val homeMetrics = rememberAreaMetrics(settings, IconArea.Home)
+    val dockMetrics = rememberAreaMetrics(settings, IconArea.Dock)
+    // Today, then the Home Screen pages, then the App Library (-1 when it is turned off).
+    val libraryPage = pageMap.libraryPosition
+    SideEffect {
         drag.state = state
-        drag.currentPage = pager.currentPage - FIRST_HOME_PAGE
+        drag.currentPage = pager.currentPage - pageMap.firstHome
         drag.screenWidth = windowWidth
+        drag.rtl = rtl
         drag.dockCapacity = settings.dockSlots
+    }
+    // Locking the layout mid-drag drops nothing: the item goes back and edit mode ends.
+    LaunchedEffect(settings.layoutLocked) {
+        if (settings.layoutLocked) {
+            drag.cancel()
+            vm.exitEditMode()
+        }
     }
 
     val pageIcons = remember { iconCallbacks(vm, actions, drag, DragSource.Page) }
@@ -140,21 +172,15 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     val todayWidgets = remember { widgetCallbacks(vm, actions, drag, onToday = true) }
     val widgetMenu = remember { widgetMenuActions(vm, actions) }
 
-    LaunchedEffect(Unit) {
+    val dispatcher = remember(vm, actions, drag, pager, scope) { homeDispatcher(vm, actions, drag, pager, scope) }
+    LaunchedEffect(dispatcher) {
         vm.homePressed.collect {
-            val overlay = vm.openFolder.value != null || vm.search.value != null || vm.openCategory.value != null ||
-                vm.stacks.editing.value != null
-            if (vm.editMode.value || overlay || vm.widgetGallery.value) {
-                vm.stacks.closeEditor()
-                vm.closeFolder()
-                vm.exitEditMode()
-                vm.closeSearch()
-                vm.closeWidgetGallery()
-                vm.openCategory.value = null
-            } else {
-                pager.animateScrollToPage(FIRST_HOME_PAGE)
-            }
+            val prefs = vm.settings.state.value
+            dispatcher.home(prefs.homeBehavior.repeatHome, prefs.appLibrary, drag.isDragging)
         }
+    }
+    LaunchedEffect(dispatcher) {
+        vm.returnToHome.collect { dispatcher.returned(vm.settings.state.value.homeBehavior.returnPolicy) }
     }
     BackHandler(enabled = menu != null || openFolder != null || editMode) {
         when {
@@ -165,10 +191,10 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     }
 
     // New widgets go to the page being looked at: Today, or the top of a home page.
-    fun widgetTarget(): WidgetTarget = if (pager.currentPage == TODAY_PAGE) {
+    fun widgetTarget(): WidgetTarget = if (pageMap.page(pager.currentPage) == HomePage.Today) {
         WidgetTarget.Today
     } else {
-        WidgetTarget.Page((pager.currentPage - FIRST_HOME_PAGE).coerceIn(0, state.pages.lastIndex))
+        WidgetTarget.Page((pager.currentPage - pageMap.firstHome).coerceIn(0, state.pages.lastIndex))
     }
 
     // iOS-like "resume" animation: coming back from an app, the icons zoom into place.
@@ -183,7 +209,7 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     }
 
     // 0 = sharp, 1 = fully blurred. Read only in layer blocks: it never recomposes the screen.
-    val overlayOpen = menu != null || openFolder != null || search != null || openCategoryId != null || gallery
+    val overlayOpen = menu != null || openFolder != null || search != null || openGroupId != null || chooserApp != null || gallery
     val blur = animateFloatAsState(
         if (overlayOpen && settings.homeBlur) 1f else 0f,
         Motion.fade(),
@@ -229,8 +255,10 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                     userScrollEnabled = !drag.isDragging,
                     modifier = Modifier.fillMaxSize(),
                     beyondViewportPageCount = 1,
+                    key = { if (it < pageMap.count) pageMap.key(it) else "retired_$it" },
                 ) { page ->
-                    if (page == TODAY_PAGE) {
+                    if (page !in 0 until pageMap.count) return@HorizontalPager
+                    if (pageMap.page(page) == HomePage.Today) {
                         TodayPage(
                             widgets = state.today,
                             editMode = editMode,
@@ -247,20 +275,22 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                     }
                     if (page == libraryPage) {
                         AppLibraryPage(
-                            categories = library,
+                            library = library,
                             onSearch = { vm.openSearch(SearchMode.Library) },
-                            onOpenCategory = { vm.openCategory.value = it },
+                            onOpenGroup = vm.library::open,
+                            onViewChange = vm.library::setView,
                             callbacks = libraryCallbacks,
                             modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility),
                         )
                         return@HorizontalPager
                     }
-                    val homePage = page - FIRST_HOME_PAGE
+                    val homePage = page - pageMap.firstHome
                     val entries = pages.getOrElse(homePage) { emptyList() }
                     PageContent(
                         page = homePage,
                         entries = entries,
-                        rows = state.rows,
+                        grid = state.grid,
+                        metrics = homeMetrics,
                         cells = if (drag.isDragging) drag.previewCells() else state.cells,
                         isCurrent = page == pager.currentPage,
                         editMode = editMode,
@@ -272,13 +302,14 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                         onGlassPrompt = actions::requestGlassAccess,
                         onEnterEdit = vm::enterEditMode,
                         onExitEdit = vm::exitEditMode,
-                        searchSwipe = settings.searchSwipe,
-                        onSearch = { vm.openSearch(SearchMode.Spotlight) },
+                        behavior = settings.homeBehavior,
+                        gesturesEnabled = !vm.globalGestureBlocked(drag),
+                        onAction = { dispatcher.execute(it, vm.settings.state.value.appLibrary, vm.globalGestureBlocked(drag)) },
                         modifier = Modifier
                             .pageTransition(settings.pageTransition) {
                                 (page - pager.currentPage) - pager.currentPageOffsetFraction
                             }
-                            .padding(top = editInset, bottom = settings.bottomBarHeight)
+                            .padding(top = editInset, bottom = settings.bottomBarHeight(dockMetrics.labelBlock))
                             .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility),
                     )
                 }
@@ -290,7 +321,7 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                         .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility)
                         .graphicsLayer {
                             val position = pager.currentPage + pager.currentPageOffsetFraction
-                            val today = (FIRST_HOME_PAGE - position).coerceIn(0f, 1f)
+                            val today = if (pageMap.today) (pageMap.firstHome - position).coerceIn(0f, 1f) else 0f
                             val library = if (libraryPage < 0) 0f else (position - (libraryPage - 1)).coerceIn(0f, 1f)
                             val away = maxOf(today, library)
                             alpha = 1f - away
@@ -300,7 +331,7 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                     if (settings.showPagePill) {
                         PagePill(
                             pager = pager,
-                            firstPage = FIRST_HOME_PAGE,
+                            firstPage = pageMap.firstHome,
                             pageCount = pages.size,
                             editMode = editMode,
                             onSearch = { vm.openSearch(SearchMode.Spotlight) },
@@ -313,14 +344,17 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                     if (!settings.showDock) SideEffect { drag.dockBounds = null }
                     if (settings.showDock) DockBar(
                         entries = dock,
+                        metrics = dockMetrics,
+                        slots = settings.dockSlots,
+                        height = settings.dockHeight(dockMetrics.labelBlock),
                         background = settings.dockBackground,
                         onBounds = { drag.dockBounds = it },
                         dropOrigin = drag::takeDropOrigin,
                         marker = drag.dockMarker(),
-                    ) { entry ->
+                    ) { entry, slot ->
                         HomeIcon(
                             entry = entry,
-                            showLabel = false,
+                            slot = slot,
                             editMode = editMode,
                             jiggleSeed = 1000 + dock.indexOf(entry),
                             callbacks = dockIcons,

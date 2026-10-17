@@ -16,6 +16,7 @@ import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.WidgetKind
 import com.zfl.launcher.data.WidgetSize
 import com.zfl.launcher.data.WidgetStackEntry
+import com.zfl.launcher.ui.menu.LibraryMenuActions
 import com.zfl.launcher.ui.menu.WidgetMenuActions
 import com.zfl.launcher.ui.widgets.suggestionAt
 import com.zfl.launcher.data.PlaceholderEntry
@@ -44,11 +45,12 @@ internal fun iconCallbacks(
 
     override fun onLongPress(entry: HomeEntry, iconBounds: Rect, pointer: Offset) {
         vm.openMenu(entry, iconBounds, inDock = source == DragSource.Dock)
-        drag.prepare(entry, source, iconBounds, pointer)
+        // A locked layout shows the menu, but the icon can't be dragged out of it.
+        if (vm.canArrange) drag.prepare(entry, source, iconBounds, pointer)
     }
 
     override fun onDragStart(entry: HomeEntry, iconBounds: Rect, pointer: Offset) {
-        drag.start(entry, source, iconBounds, pointer)
+        if (vm.canArrange) drag.start(entry, source, iconBounds, pointer)
     }
 
     override fun onRemove(entry: AppEntry) {
@@ -82,11 +84,11 @@ internal fun widgetCallbacks(
 
     override fun onLongPress(entry: PageWidgetEntry, bounds: Rect, pointer: Offset) {
         vm.openMenu(entry, bounds, inDock = false)
-        if (!onToday) drag.prepare(entry, DragSource.Page, bounds, pointer)
+        if (!onToday && vm.canArrange) drag.prepare(entry, DragSource.Page, bounds, pointer)
     }
 
     override fun onDragStart(entry: PageWidgetEntry, bounds: Rect, pointer: Offset) {
-        if (!onToday) drag.start(entry, DragSource.Page, bounds, pointer)
+        if (!onToday && vm.canArrange) drag.start(entry, DragSource.Page, bounds, pointer)
     }
 
     override fun onRemove(entry: PageWidgetEntry) = vm.removeWidget(entry.id)
@@ -104,7 +106,7 @@ internal fun widgetMenuActions(vm: LauncherViewModel, actions: LauncherActions):
 
     override fun sizes(widget: PageWidgetEntry): List<Span> = when (widget) {
         is WidgetEntry -> widget.kind.sizes.map { it.span }
-        is AppWidgetEntry -> vm.appWidgets.info(widget.appWidgetId)?.let(vm.appWidgets::spans) ?: listOf(widget.span)
+        is AppWidgetEntry -> vm.appWidgets.info(widget.appWidgetId)?.let { vm.appWidgets.spans(it, vm.state.value.grid) } ?: listOf(widget.span)
         // Every size one of its widgets takes; the others are shown but unavailable.
         is WidgetStackEntry -> widget.items.flatMap(::sizes).filter { span -> WidgetSize.entries.any { it.span == span } }.distinct()
             .sortedWith(compareBy({ it.columns * it.rows }, { it.columns }))
@@ -125,11 +127,17 @@ internal fun stackEditorActions(vm: LauncherViewModel): StackEditorActions = obj
 
 internal fun libraryCallbacks(vm: LauncherViewModel, actions: LauncherActions): LibraryCallbacks = object : LibraryCallbacks {
     override fun onLaunch(app: AppInfo, bounds: Rect) {
-        vm.openCategory.value = null
+        vm.library.close()
         actions.launch(app, bounds)
     }
 
-    override fun onLongPress(app: AppInfo, bounds: Rect) = vm.openMenu(AppEntry(app), bounds, inDock = false)
+    override fun onLongPress(app: AppInfo, bounds: Rect) = vm.openMenu(AppEntry(app), bounds, inDock = false, inLibrary = true)
+}
+
+internal fun libraryMenuActions(vm: LauncherViewModel): LibraryMenuActions = object : LibraryMenuActions {
+    override fun isPinned(app: AppInfo): Boolean = vm.library.isPinned(app)
+    override fun togglePin(app: AppInfo) = vm.library.togglePin(app)
+    override fun chooseCategory(app: AppInfo) = vm.library.chooseCategory(app)
 }
 
 internal fun searchCallbacks(vm: LauncherViewModel, actions: LauncherActions): SearchCallbacks = object : SearchCallbacks {
@@ -153,17 +161,16 @@ internal class HomeDragCallbacks(
     private val vm: LauncherViewModel,
     private val scope: CoroutineScope,
     private val pager: PagerState,
-    private val firstHomePage: Int,
+    private val firstHomePage: () -> Int,
 ) : DragController.Callbacks {
     override fun onDragActivated() {
-        vm.closeMenu()
-        vm.editMode.value = true
+        vm.enterEditMode()
     }
 
     override fun onDrop(id: String, position: DropPosition) = vm.drop(id, position)
 
     override fun onFlipPage(page: Int) {
-        scope.launch { pager.animateScrollToPage(page + firstHomePage) }
+        scope.launch { pager.animateScrollToPage(page + firstHomePage()) }
     }
 
     override fun onLeaveFolder() = vm.closeFolder()

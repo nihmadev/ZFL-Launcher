@@ -18,16 +18,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import com.zfl.launcher.data.GRID_COLUMNS
+import com.zfl.launcher.data.GridSpec
+import com.zfl.launcher.ui.theme.Tokens
 import com.zfl.launcher.data.WidgetEntry
 import com.zfl.launcher.data.packCells
 import com.zfl.launcher.data.span
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.launcherHaptics
 import com.zfl.launcher.ui.theme.Haptics
 
 /** Side margin and the gap between widgets on the Today page, measured from iOS27L. */
 private val TodayMargin = 33.dp
 private val TodayGap = 36.dp
+
+/** Widgets on the Today page have no names and their own insets ([HomeWidget] slotInset). */
+private val TodaySlot = IconSlot(Tokens.IconSize, Tokens.IconSize, showLabel = false, labelScale = 1f)
 
 /**
  * The Today page, left of the first home page: a scrolling stack of widgets, small ones
@@ -39,35 +43,34 @@ internal fun TodayPage(
     editMode: Boolean,
     liftedId: String?,
     callbacks: WidgetCallbacks,
-    onEnterEdit: () -> Unit,
+    /** Enters edit mode; false when the layout is locked. */
+    onEnterEdit: () -> Boolean,
     onExitEdit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val haptic = LocalHapticFeedback.current
+    val haptic = launcherHaptics()
     BoxWithConstraints(
         modifier
             .fillMaxSize()
             .pointerInput(editMode) {
                 detectTapGestures(
                     onLongPress = {
-                        if (!editMode) {
-                            haptic.performHapticFeedback(Haptics.Lift)
-                            onEnterEdit()
-                        }
+                        if (!editMode && onEnterEdit()) haptic.performHapticFeedback(Haptics.Lift)
                     },
                     onTap = { if (editMode) onExitEdit() },
                 )
             },
     ) {
         val width = maxWidth - TodayMargin * 2
+        val spans = widgets.map { it.span }
+        // The Today page has its own grid: as tall as its widgets, whatever the Home Screen grid is.
+        val grid = GridSpec(GridSpec.TODAY_COLUMNS, spans.sumOf { it.rows }.coerceAtLeast(1))
         // Two small widgets and the gap between them fill the width; a cell is half a small widget.
-        val cellWidth = (width + TodayGap) / GRID_COLUMNS
+        val cellWidth = (width + TodayGap) / grid.columns
         val small = cellWidth * 2 - TodayGap
         val rowHeight = (small + TodayGap) / 2
-        val spans = widgets.map { it.span }
-        val totalRows = spans.sumOf { it.rows }
-        val cells = remember(spans) { packCells(spans, GRID_COLUMNS, totalRows.coerceAtLeast(1)) }
-        val usedRows = widgets.indices.maxOfOrNull { i -> (cells[i] ?: 0) / GRID_COLUMNS + spans[i].rows } ?: 0
+        val cells = remember(spans) { packCells(spans, grid) }
+        val usedRows = widgets.indices.maxOfOrNull { i -> grid.rowOf(cells[i] ?: 0) + spans[i].rows } ?: 0
 
         Box(
             Modifier
@@ -82,6 +85,7 @@ internal fun TodayPage(
                 key(widget.id) {
                     HomeWidget(
                         entry = widget,
+                        slot = TodaySlot,
                         editMode = editMode,
                         jiggleSeed = 500 + index,
                         callbacks = callbacks,
@@ -90,7 +94,7 @@ internal fun TodayPage(
                         slotInset = TodayGap / 2,
                         hidden = widget.id == liftedId,
                         modifier = Modifier
-                            .offset(x = cellWidth * (cell % GRID_COLUMNS), y = rowHeight * (cell / GRID_COLUMNS))
+                            .offset(x = cellWidth * grid.columnOf(cell), y = rowHeight * grid.rowOf(cell))
                             .size(cellWidth * spans[index].columns, rowHeight * spans[index].rows),
                     )
                 }

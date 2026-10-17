@@ -9,8 +9,13 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.LaunchedEffect
 import com.zfl.launcher.data.Span
+import com.zfl.launcher.data.GridSpec
+import androidx.compose.ui.unit.Dp
 import com.zfl.launcher.settings.LocalSettingsState
-import com.zfl.launcher.settings.SearchSwipe
+import com.zfl.launcher.settings.HomeBehavior
+import com.zfl.launcher.settings.HomeAction
+import com.zfl.launcher.settings.HomeBinding
+import androidx.compose.ui.platform.LocalWindowInfo
 import com.zfl.launcher.ui.shape.IconShape
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -74,7 +79,7 @@ import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.launcherHaptics
 import com.zfl.launcher.ui.theme.Haptics
 import com.zfl.launcher.ui.theme.Motion
 
@@ -83,7 +88,8 @@ import com.zfl.launcher.ui.theme.Motion
 internal fun PageContent(
     page: Int,
     entries: List<HomeEntry>,
-    rows: Int,
+    grid: GridSpec,
+    metrics: AreaMetrics,
     cells: Map<String, Int>,
     isCurrent: Boolean,
     editMode: Boolean,
@@ -93,19 +99,26 @@ internal fun PageContent(
     widgetCallbacks: WidgetCallbacks,
     showGlassPrompt: Boolean,
     onGlassPrompt: () -> Unit,
-    onEnterEdit: () -> Unit,
+    /** Enters edit mode; false when the layout is locked. */
+    onEnterEdit: () -> Boolean,
     onExitEdit: () -> Unit,
-    searchSwipe: SearchSwipe,
-    onSearch: () -> Unit,
+    behavior: HomeBehavior,
+    gesturesEnabled: Boolean,
+    onAction: (HomeAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
-    val haptic = LocalHapticFeedback.current
+    val haptic = launcherHaptics()
     var origin by remember { mutableStateOf(Offset.Zero) }
     var geometry by remember { mutableStateOf<GridGeometry?>(null) }
+    val settings = LocalSettingsState.current
     val currentEntries by rememberUpdatedState(entries)
     val currentCells by rememberUpdatedState(cells)
-    val currentOnSearch by rememberUpdatedState(onSearch)
+    val currentAction by rememberUpdatedState(onAction)
+    val currentBehavior by rememberUpdatedState(behavior)
+    val window = LocalWindowInfo.current
+    val enabled = gesturesEnabled && !editMode && window.isWindowFocused
+    val currentEnabled by rememberUpdatedState(enabled)
     // Icons handle their own gestures; the page only reacts to touches on empty space.
     fun isOnIcon(local: Offset): Boolean {
         val grid = geometry ?: return false
@@ -114,48 +127,43 @@ internal fun PageContent(
             p.x < grid.origin.x + grid.cellWidth * grid.columns && p.y < grid.origin.y + grid.cellHeight * grid.rows
         if (!inside) return false
         val spans = currentEntries.map { it.span }
-        return itemAtCell(spans, packCells(spans, grid.columns, grid.rows, currentEntries.map { currentCells[it.id] }), grid.cellAt(p), grid.columns) != null
+        return itemAtCell(spans, packCells(spans, grid.grid, currentEntries.map { currentCells[it.id] }), grid.cellAt(p), grid.grid) != null
     }
 
     Box(
         modifier
             .fillMaxSize()
             .onGloballyPositioned { origin = it.positionInWindow() }
-            .pointerInput(editMode) {
+            .pointerInput(editMode, enabled, behavior.emptyDoubleTap) {
                 detectTapGestures(
+                    onDoubleTap = if (enabled && behavior.emptyDoubleTap != HomeAction.None) ({ p ->
+                        if (!isOnIcon(p) && currentEnabled && !drag.isDragging) currentAction(currentBehavior.emptyDoubleTap)
+                    }) else null,
                     onLongPress = {
-                        if (!editMode && !isOnIcon(it)) {
-                            haptic.performHapticFeedback(Haptics.Lift)
-                            onEnterEdit()
-                        }
+                        if (!editMode && !isOnIcon(it) && onEnterEdit()) haptic.performHapticFeedback(Haptics.Lift)
                     },
                     onTap = { if (editMode && !isOnIcon(it)) onExitEdit() },
                 )
             }
-            .pointerInput(editMode, searchSwipe) {
-                if (editMode || searchSwipe == SearchSwipe.Disabled) return@pointerInput
-                val threshold = with(density) { Tokens.SearchSwipeThreshold.toPx() }
-                var total = 0f
-                var triggered = false
-                detectVerticalDragGestures(
-                    onDragStart = { total = 0f; triggered = false },
-                    onVerticalDrag = { change, dy ->
-                        total += dy
-                        if (!triggered && searchSwipe.isTriggered(total, threshold)) {
-                            triggered = true
-                            change.consume()
-                            haptic.performHapticFeedback(Haptics.Threshold)
-                            currentOnSearch()
-                        }
-                    },
-                )
-            },
+            .homeSwipe(
+                enabled = enabled,
+                threshold = with(density) { Tokens.SearchSwipeThreshold.toPx() },
+                canHandle = { currentBehavior[it] != HomeAction.None },
+                stillEnabled = { currentEnabled && !drag.isDragging },
+                onAction = {
+                    haptic.performHapticFeedback(Haptics.Threshold)
+                    currentAction(currentBehavior[it])
+                },
+            ),
     ) {
         IconGrid(
             entries = entries,
-            rows = rows,
+            grid = grid,
+            metrics = metrics,
+            margins = settings.gridMargins,
+            alignment = settings.gridAlignment,
             cells = cells,
-            header = { if (showGlassPrompt) GlassPrompt(onGlassPrompt) },
+            header = if (showGlassPrompt) ({ GlassPrompt(onGlassPrompt) }) else null,
             marker = drag.pageMarker(page),
             markerSquare = (drag.session?.entry as? PageWidgetEntry)?.isSquare == true,
             onGeometry = {
@@ -163,10 +171,11 @@ internal fun PageContent(
                 if (isCurrent) drag.pageGrid = it
             },
             dropOrigin = drag::takeDropOrigin,
-        ) { entry ->
+        ) { entry, slot ->
             if (entry is PageWidgetEntry) {
                 HomeWidget(
                     entry = entry,
+                    slot = slot,
                     editMode = editMode,
                     jiggleSeed = page * 100 + entries.indexOf(entry),
                     callbacks = widgetCallbacks,
@@ -179,7 +188,7 @@ internal fun PageContent(
             } else {
                 HomeIcon(
                     entry = entry,
-                    showLabel = true,
+                    slot = slot,
                     editMode = editMode,
                     jiggleSeed = page * 100 + entries.indexOf(entry),
                     callbacks = callbacks,
@@ -196,7 +205,7 @@ internal fun PageContent(
  * card for widgets. Fades in so it doesn't flicker while the target is still moving.
  */
 @Composable
-internal fun DropMarker(span: Span, modifier: Modifier = Modifier, square: Boolean = false) {
+internal fun DropMarker(span: Span, iconSize: Dp, modifier: Modifier = Modifier, square: Boolean = false) {
     val settings = LocalSettingsState.current
     val alpha = remember { Animatable(0f) }
     LaunchedEffect(Unit) { alpha.animateTo(1f, tween(Motion.MARKER_FADE_MS)) }
@@ -204,11 +213,11 @@ internal fun DropMarker(span: Span, modifier: Modifier = Modifier, square: Boole
     if (span == Span.One) {
         val shape = IconShape(settings.iconCorner)
         Box(modifier, contentAlignment = Alignment.TopCenter) {
-            Box(fade.size(settings.iconSize).background(DropMarkerFill, shape).border(1.dp, DropMarkerStroke, shape))
+            Box(fade.size(iconSize).background(DropMarkerFill, shape).border(1.dp, DropMarkerStroke, shape))
         }
     } else {
         BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            val body = widgetBodySize(DpSize(maxWidth, maxHeight), span, square, settings.iconSize, withLabel = false)
+            val body = widgetBodySize(DpSize(maxWidth, maxHeight), span, square, iconSize, withLabel = false)
             val shape = ContinuousRoundedShape(22.dp)
             Box(fade.size(body).background(DropMarkerFill, shape).border(1.dp, DropMarkerStroke, shape))
         }
@@ -218,10 +227,11 @@ internal fun DropMarker(span: Span, modifier: Modifier = Modifier, square: Boole
 private val DropMarkerFill = Color.White.copy(alpha = 0.10f)
 private val DropMarkerStroke = Color.White.copy(alpha = 0.22f)
 
-/** The icon under the finger while dragging: slightly bigger, floating above everything. */
+/** The icon under the finger while dragging, as big as it was where it was picked up: slightly bigger, floating above everything. */
 @Composable
 internal fun DraggedIcon(drag: DragController) {
     val session = drag.session?.takeIf { it.active } ?: return
+    val size = with(LocalDensity.current) { DpSize(session.itemSize.width.toDp(), session.itemSize.height.toDp()) }
     Box(
         Modifier
             .offset {
@@ -235,12 +245,9 @@ internal fun DraggedIcon(drag: DragController) {
             },
     ) {
         when (val entry = session.entry) {
-            is AppEntry -> AppIconImage(entry.app)
-            is FolderEntry -> FolderIcon(entry)
-            is PageWidgetEntry -> {
-                val size = with(LocalDensity.current) { DpSize(session.itemSize.width.toDp(), session.itemSize.height.toDp()) }
-                PageWidgetBody(entry, Modifier.size(size), live = false)
-            }
+            is AppEntry -> AppIconImage(entry.app, size = size.width)
+            is FolderEntry -> FolderIcon(entry, size = size.width)
+            is PageWidgetEntry -> PageWidgetBody(entry, Modifier.size(size), live = false)
             is PlaceholderEntry -> Unit
         }
     }
