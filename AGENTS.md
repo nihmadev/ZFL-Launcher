@@ -75,11 +75,35 @@ Run Gradle via the wrapper from the repository root. Choose checks appropriate t
 ```
 
 - Pure logic (`LayoutModel` operations, layout generation, import parsing, settings migration) gets JVM unit tests in `app/src/test/`. Add regression coverage for changed behavior; avoid tests that merely repeat the implementation. When adding the first tests, add only the minimal test dependency (JUnit).
-- Run `assembleRelease` when touching R8/ProGuard rules, reflection, serialization, or anything loaded by name; the release build shrinks code and resources.
+- Run `assembleRelease` when touching R8/ProGuard rules, reflection, serialization, or anything loaded by name; the release build shrinks code and resources. It is a heavy build: run the system resource gate first (see "Heavy builds" below).
 - After `installDebug`, press Home to bring the launcher up. Check logcat for crashes: `adb logcat -b crash` and `adb logcat --pid=$(adb shell pidof com.zfl.launcher)`.
 - Do not clear app data, uninstall the launcher, or reset the default home app on the device without asking: it wipes the user's real layout.
 - Distinguish baseline failures and pre-existing lint warnings from regressions introduced by the change. Do not hide failures with `@Suppress`, lint baselines, or skipped checks without an explained reason, and do not describe partial coverage as full verification.
 - Documentation-only changes do not need a Gradle build.
+
+## Heavy builds: system resource gate (mandatory)
+
+The developer's Linux desktop (Niri + Noctalia) has crashed repeatedly when R8 release builds ran on a low-memory or CPU-saturated machine. Heavy builds are therefore gated on a live system check.
+
+- **Heavy tasks** are every R8/minify build and release packaging: `assembleRelease`, `bundleRelease`, `minifyReleaseWithR8`, `lintRelease`, and any other `*Release*` task. Debug builds and unit tests are not gated by this section, but the same check applies if the machine is already loaded.
+- **Before each heavy task, run the check again.** Never reuse an earlier result, never assume the machine is idle because it was idle earlier, and never skip the check because the task "should be quick".
+- Run the check with this command (values from `/proc`, no extra tools):
+
+```sh
+awk '/MemAvailable/{ma=$2} END{printf "MemAvailable: %.1f GiB\n", ma/1048576}' /proc/meminfo
+awk -v n="$(nproc)" '{printf "load1: %s, cores: %s, load/core: %.2f\n", $1, n, $1/n}' /proc/loadavg
+grep -E '^(some|full)' /proc/pressure/memory 2>/dev/null || echo "PSI memory: unavailable"
+```
+
+- **Do not start a heavy task** if any of these hold:
+  - `MemAvailable` is below **6 GiB**;
+  - `load1 / cores` is above **0.5** (CPU is busy; the sample is taken right before the build, so a single high reading counts);
+  - PSI `some avg10` for memory is above **1.00** (the system is already under memory pressure);
+  - a Gradle daemon or another build is already running (`pgrep -fa 'GradleDaemon|gradlew'` finds a match, excluding the one you are about to start).
+- If a gate fails, **do not run the build and do not try to lower the limits** (no `--max-workers`, `-Xmx` changes, `gradle.properties` tweaks, or killing other processes to make room). Report the measured values to the user, state which gate failed, and offer to run the build later or on their confirmation. Finish all other work that does not need the build.
+- Only the user can override a failed gate, in chat, for the specific build they name. Permission from a previous build does not carry over.
+- Do not run heavy tasks in the background to "check later", and do not loop on the check waiting for the machine to become idle.
+- In the final report, state the gate values measured before each heavy build, or state that the build was skipped because a gate failed.
 
 ## Performance
 
