@@ -31,6 +31,8 @@ object Motion {
     private const val BOUNCY_STIFFNESS = 400f
     private const val PRESS_STIFFNESS = 600f
     private const val FADE_STIFFNESS = 400f
+    private const val GEL_DAMPING = 0.5f
+    private const val GEL_STIFFNESS = 300f
 
     /** Short fade of small helpers (jiggle amount, merge halo). */
     const val QUICK_FADE_MS: Int = 150
@@ -62,6 +64,9 @@ object Motion {
 
     /** Press-down scale of buttons: no overshoot. */
     fun <T> press(): SpringSpec<T> = spring(stiffness = PRESS_STIFFNESS)
+
+    /** Liquid glass under a finger: springy, it overshoots and wobbles back like a gel. */
+    fun <T> gel(): SpringSpec<T> = spring(GEL_DAMPING, GEL_STIFFNESS)
 
     /** Scrims, the home blur and fades of overlays, so dimming keeps pace with blurring. */
     fun <T> fade(): SpringSpec<T> = spring(stiffness = FADE_STIFFNESS)
