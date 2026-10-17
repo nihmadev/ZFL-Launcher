@@ -22,7 +22,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalHapticFeedback
+import com.zfl.launcher.ui.theme.launcherHaptics
 import androidx.compose.ui.unit.dp
 import com.zfl.launcher.data.AppEntry
 import com.zfl.launcher.data.FolderEntry
@@ -31,7 +31,6 @@ import com.zfl.launcher.data.WidgetEntry
 import com.zfl.launcher.data.PlaceholderEntry
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
-import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.ui.theme.Haptics
 
 /** What a [HomeIcon] reports back. Bounds and pointers are in window coordinates. */
@@ -45,7 +44,8 @@ interface HomeIconCallbacks {
 }
 
 /**
- * One app or folder on the home screen, in the dock or in an open folder.
+ * One app or folder on the home screen, in the dock or in an open folder, drawn with the
+ * [slot] of its area (icon size, touch width and name).
  *
  * Normal mode: tap opens, long-press shows the menu. Edit mode: icons jiggle, apps get a
  * "−" badge, dragging starts as soon as the finger moves, taps open folders.
@@ -57,7 +57,7 @@ interface HomeIconCallbacks {
 @Composable
 fun HomeIcon(
     entry: HomeEntry,
-    showLabel: Boolean,
+    slot: IconSlot,
     editMode: Boolean,
     jiggleSeed: Int,
     callbacks: HomeIconCallbacks,
@@ -66,8 +66,7 @@ fun HomeIcon(
     mergeTarget: Boolean = false,
 ) {
     if (entry is PlaceholderEntry || entry is PageWidgetEntry) return
-    val settings = LocalSettingsState.current
-    val haptic = LocalHapticFeedback.current
+    val haptic = launcherHaptics()
     var bounds by remember { mutableStateOf(Rect.Zero) }
     var columnOrigin by remember { mutableStateOf(Offset.Zero) }
     var pressed by remember { mutableStateOf(false) }
@@ -115,7 +114,7 @@ fun HomeIcon(
 
     Column(
         modifier
-            .width(settings.iconSize + 16.dp)
+            .width(slot.width)
             .onGloballyPositioned { columnOrigin = it.boundsInWindow().topLeft }
             .graphicsLayer { alpha = if (hidden) 0f else 1f }
             .jiggle(editMode, jiggleSeed)
@@ -123,11 +122,11 @@ fun HomeIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            MergeHalo(visible = mergeTarget && entry is AppEntry)
+            MergeHalo(visible = mergeTarget && entry is AppEntry, size = slot.iconSize)
             val iconModifier = Modifier.onGloballyPositioned { bounds = it.boundsInWindow() }
             when (entry) {
-                is AppEntry -> AppIconImage(entry.app, iconModifier, dimmed = pressed)
-                is FolderEntry -> FolderIcon(entry, iconModifier, highlighted = mergeTarget)
+                is AppEntry -> AppIconImage(entry.app, iconModifier, size = slot.iconSize, dimmed = pressed)
+                is FolderEntry -> FolderIcon(entry, iconModifier, size = slot.iconSize, highlighted = mergeTarget)
                 is PlaceholderEntry, is PageWidgetEntry -> Unit
             }
             if (editMode && entry is AppEntry) {
@@ -139,7 +138,7 @@ fun HomeIcon(
                 )
             }
         }
-        if (showLabel && settings.showLabels) {
+        if (slot.showLabel) {
             LabelSpacer()
             IconLabel(
                 when (entry) {
@@ -147,6 +146,7 @@ fun HomeIcon(
                     is FolderEntry -> entry.name
                     is PlaceholderEntry, is PageWidgetEntry -> ""
                 },
+                scale = slot.labelScale,
             )
         }
     }

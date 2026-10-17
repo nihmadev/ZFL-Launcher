@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.settings.SettingsState
+import com.zfl.launcher.settings.IconArea
 import com.zfl.launcher.R
 import com.zfl.launcher.data.AppEntry
 import com.zfl.launcher.data.FolderEntry
@@ -60,18 +61,27 @@ import com.zfl.launcher.ui.theme.Tokens
 /**
  * A miniature, non-interactive copy of the first home screen page: the user's wallpaper,
  * apps, labels and dock. It is laid out at the real screen size with the same components
- * as the home screen, then scaled down to fit, so it matches the result exactly.
+ * and the same grid calculation as the home screen ([IconGrid], [gridFrame]), then scaled
+ * down to fit, so it matches the result exactly.
  *
  * @param wallpaper sharp wallpaper image, or null to use a neutral gradient.
+ * @param prefs settings to draw with: the saved ones, or a draft being edited.
  */
 @Composable
-fun HomePreview(state: HomeState, wallpaper: ImageBitmap?, modifier: Modifier = Modifier) {
+fun HomePreview(
+    state: HomeState,
+    wallpaper: ImageBitmap?,
+    modifier: Modifier = Modifier,
+    prefs: SettingsState = LocalSettingsState.current,
+) {
     val density = LocalDensity.current
     val window = LocalWindowInfo.current.containerSize
     val screenWidth = with(density) { window.width.toDp() }
     val screenHeight = with(density) { window.height.toDp() }
     val statusBar = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
     val navigationBar = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
+    val homeMetrics = rememberAreaMetrics(prefs, IconArea.Home)
+    val dockMetrics = rememberAreaMetrics(prefs, IconArea.Dock)
 
     BoxWithConstraints(modifier) {
         val scale = maxWidth / screenWidth
@@ -95,28 +105,36 @@ fun HomePreview(state: HomeState, wallpaper: ImageBitmap?, modifier: Modifier = 
                 }
                 // Glass sampling uses window coordinates, which a scaled copy can't match: use the flat tint.
                 CompositionLocalProvider(LocalGlassSource provides null) {
-                    Column(
+                    Box(
                         Modifier
                             .fillMaxSize()
                             .padding(top = statusBar, bottom = navigationBar),
                     ) {
                         IconGrid(
                             entries = state.pages.firstOrNull().orEmpty(),
-                            rows = state.rows,
+                            grid = state.grid,
+                            metrics = homeMetrics,
+                            margins = prefs.gridMargins,
+                            alignment = prefs.gridAlignment,
                             cells = state.cells,
-                            modifier = Modifier.weight(1f),
-                        ) { entry -> StaticIcon(entry, showLabel = true) }
-                        val settings = LocalSettingsState.current
-                        if (settings.showPagePill) {
-                            SearchPill(
-                                Modifier
-                                    .align(Alignment.CenterHorizontally)
-                                    .padding(vertical = SettingsState.PILL_MARGIN),
-                            )
-                        }
-                        if (settings.showDock) {
-                            DockBar(entries = state.dock, background = settings.dockBackground) { entry ->
-                                StaticIcon(entry, showLabel = false)
+                            modifier = Modifier.padding(bottom = prefs.bottomBarHeight(dockMetrics.labelBlock)),
+                        ) { entry, slot -> StaticIcon(entry, slot) }
+                        Column(Modifier.align(Alignment.BottomCenter)) {
+                            if (prefs.showPagePill) {
+                                SearchPill(
+                                    Modifier
+                                        .align(Alignment.CenterHorizontally)
+                                        .padding(vertical = SettingsState.PILL_MARGIN),
+                                )
+                            }
+                            if (prefs.showDock) {
+                                DockBar(
+                                    entries = state.dock,
+                                    metrics = dockMetrics,
+                                    slots = prefs.dockSlots,
+                                    height = prefs.dockHeight(dockMetrics.labelBlock),
+                                    background = prefs.dockBackground,
+                                ) { entry, slot -> StaticIcon(entry, slot) }
                             }
                         }
                     }
@@ -128,19 +146,18 @@ fun HomePreview(state: HomeState, wallpaper: ImageBitmap?, modifier: Modifier = 
 
 /** An app, folder or widget with its label, without any touch handling. */
 @Composable
-private fun StaticIcon(entry: HomeEntry, showLabel: Boolean) {
-    val settings = LocalSettingsState.current
+private fun StaticIcon(entry: HomeEntry, slot: IconSlot) {
     if (entry is PageWidgetEntry) {
-        StaticWidget(entry, withLabel = false)
+        StaticWidget(entry, slot)
         return
     }
-    Column(Modifier.width(settings.iconSize + 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.width(slot.width), horizontalAlignment = Alignment.CenterHorizontally) {
         when (entry) {
-            is AppEntry -> AppIconImage(entry.app)
-            is FolderEntry -> FolderIcon(entry)
+            is AppEntry -> AppIconImage(entry.app, size = slot.iconSize)
+            is FolderEntry -> FolderIcon(entry, size = slot.iconSize)
             is PlaceholderEntry, is PageWidgetEntry -> Unit
         }
-        if (showLabel && settings.showLabels) {
+        if (slot.showLabel) {
             Spacer(Modifier.height(LabelGap))
             IconLabel(
                 when (entry) {
@@ -148,6 +165,7 @@ private fun StaticIcon(entry: HomeEntry, showLabel: Boolean) {
                     is FolderEntry -> entry.name
                     is PlaceholderEntry, is PageWidgetEntry -> ""
                 },
+                scale = slot.labelScale,
             )
         }
     }
@@ -168,18 +186,11 @@ private fun SearchPill(modifier: Modifier = Modifier) {
     }
 }
 
-/** A widget card sized like on the real home screen. */
+/** A widget card sized like on the real home screen (no name, as on the pages). */
 @Composable
-private fun StaticWidget(entry: PageWidgetEntry, withLabel: Boolean) {
-    val iconSize = LocalSettingsState.current.iconSize
+private fun StaticWidget(entry: PageWidgetEntry, slot: IconSlot) {
     BoxWithConstraints(contentAlignment = Alignment.TopCenter) {
-        val body = widgetBodySize(DpSize(maxWidth, maxHeight), entry.span, entry.isSquare, iconSize, withLabel)
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            PageWidgetBody(entry, Modifier.size(body), live = false)
-            if (withLabel) {
-                Spacer(Modifier.height(LabelGap))
-                IconLabel(widgetLabel(entry))
-            }
-        }
+        val body = widgetBodySize(DpSize(maxWidth, maxHeight), entry.span, entry.isSquare, slot.iconSize, withLabel = false)
+        PageWidgetBody(entry, Modifier.size(body), live = false)
     }
 }

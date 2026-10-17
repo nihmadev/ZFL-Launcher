@@ -50,6 +50,12 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import com.zfl.launcher.data.FolderEntry
+import com.zfl.launcher.data.GridSpec
+import com.zfl.launcher.settings.GridAlignment
+import com.zfl.launcher.settings.GridMargins
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.DpSize
 import com.zfl.launcher.data.HomeEntry
 import com.zfl.launcher.data.packCells
 import com.zfl.launcher.data.Span
@@ -64,103 +70,94 @@ import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
 import com.zfl.launcher.ui.theme.Motion
 
-/** Tallest a grid cell may get, so icons don't drift apart on a sparse 4×5 grid. */
-private val MaxCellHeight = 112.dp
-
-/** Smallest space between two dock icons. */
-private val DockIconGap = 8.dp
-
 /** Spring used when icons slide to their new slots. */
-private val SlotSpring = Motion.settle<IntOffset>()
+internal val SlotSpring = Motion.settle<IntOffset>()
 
 /**
- * Lays out [entries] as a [columns] × [rows] grid, filled top-left first (widgets span
- * several cells, see [packCells]). Each item sits in
- * its slot through an animated offset, so when the order changes (drag and drop) icons
- * slide to their new place instead of jumping. Shared by home pages, open folders and the
- * settings preview.
+ * Lays out [entries] on [grid], filled top-left first (widgets span several cells, see
+ * [packCells]), inside the area this composable gets, with [gridFrame] deciding margins,
+ * cell size and vertical position. Each item sits in its slot through an animated offset,
+ * so when the order changes (drag and drop) icons slide to their new place instead of
+ * jumping. Shared by home pages, open folders and the settings preview.
  *
- * @param header optional content above the grid (e.g. the glass access prompt).
+ * @param header optional content above the grid (e.g. the glass access prompt); its height
+ *   is taken out of the grid's area.
  * @param onGeometry receives the window-space grid layout (used for drag and drop hit tests).
  * @param dropOrigin returns where a just-dropped item was released, to animate it from there.
  */
 @Composable
 fun IconGrid(
     entries: List<HomeEntry>,
-    rows: Int,
+    grid: GridSpec,
+    metrics: AreaMetrics,
     modifier: Modifier = Modifier,
-    columns: Int = Tokens.GridColumns,
-    topPadding: Dp = 12.dp,
-    header: @Composable () -> Unit = {},
+    margins: GridMargins = GridMargins.Default,
+    alignment: GridAlignment = GridAlignment.Top,
+    header: (@Composable () -> Unit)? = null,
     onGeometry: ((GridGeometry) -> Unit)? = null,
     dropOrigin: (String) -> Offset? = { null },
     marker: Pair<Int, Span>? = null,
     markerSquare: Boolean = false,
     cells: Map<String, Int> = emptyMap(),
-    item: @Composable (HomeEntry) -> Unit,
+    item: @Composable (HomeEntry, IconSlot) -> Unit,
 ) {
     val density = LocalDensity.current
-    val iconSize = LocalSettingsState.current.iconSize
-    BoxWithConstraints(
-        modifier
-            .fillMaxSize()
-            .padding(horizontal = Tokens.GridSidePadding)
-            .padding(top = topPadding),
-    ) {
-        val cellWidth = maxWidth / columns
-        // Bigger icons need taller cells; the cap moves with them.
-        val cellHeight = min(maxHeight / rows, MaxCellHeight + (iconSize - Tokens.IconSize))
-        val cellWidthPx = with(density) { cellWidth.toPx() }
-        val cellHeightPx = with(density) { cellHeight.toPx() }
-        Column {
-            header()
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    Column(modifier.fillMaxSize()) {
+        if (header != null) {
+            Box(Modifier.padding(start = margins.side, end = margins.side, top = margins.top)) { header() }
+        }
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val area = DpSize(maxWidth, maxHeight)
+            // Below a header the top margin is already above it.
+            val frame = remember(area, grid, margins, alignment, metrics, header != null) {
+                gridFrame(area, grid, if (header != null) margins.copy(top = 0.dp) else margins, alignment, metrics)
+            }
+            val slot = frame.iconSlot(metrics)
+            val cellWidthPx = with(density) { frame.cellWidth.toPx() }
+            val cellHeightPx = with(density) { frame.cellHeight.toPx() }
+            val iconPx = with(density) { frame.iconSize.toPx() }
+            val widthPx = cellWidthPx * grid.columns
             var originInWindow by remember { mutableStateOf(Offset.Zero) }
             Box(
                 Modifier
-                    .fillMaxWidth()
-                    .height(cellHeight * rows)
+                    .padding(start = frame.side, top = frame.top)
+                    .size(frame.width, frame.height)
                     .onGloballyPositioned { coordinates ->
                         originInWindow = coordinates.positionInWindow()
-                        onGeometry?.invoke(
-                            GridGeometry(
-                                origin = originInWindow,
-                                cellWidth = cellWidthPx,
-                                cellHeight = cellHeightPx,
-                                columns = columns,
-                                rows = rows,
-                                iconSize = with(density) { iconSize.toPx() },
-                            ),
-                        )
+                        onGeometry?.invoke(GridGeometry(originInWindow, cellWidthPx, cellHeightPx, grid, iconPx, rtl))
                     },
             ) {
-                // Widgets take several cells; apps flow around them (see packCells).
+                fun slotOffset(cell: Int) = IntOffset(
+                    (grid.columnOf(cell) * cellWidthPx).roundToInt(),
+                    (grid.rowOf(cell) * cellHeightPx).roundToInt(),
+                )
                 marker?.let { (cell, span) ->
                     key("dropMarker") {
                         MarkerSlot(
-                            target = IntOffset(((cell % columns) * cellWidthPx).roundToInt(), ((cell / columns) * cellHeightPx).roundToInt()),
-                            modifier = Modifier.size(cellWidth * span.columns, cellHeight * span.rows),
-                        ) { DropMarker(span, square = markerSquare) }
+                            target = slotOffset(cell),
+                            modifier = Modifier.size(frame.cellWidth * span.columns, frame.cellHeight * span.rows),
+                        ) { DropMarker(span, frame.iconSize, square = markerSquare) }
                     }
                 }
+                // Widgets take several cells; apps flow around them (see packCells).
                 val spans = entries.map { it.span }
                 val preferred = entries.map { cells[it.id] }
-                val placed = remember(spans, columns, rows, preferred) { packCells(spans, columns, rows, preferred) }
+                val placed = remember(spans, grid, preferred) { packCells(spans, grid, preferred) }
                 entries.forEachIndexed { index, entry ->
                     val cell = placed[index] ?: return@forEachIndexed
+                    val span = spans[index]
                     key(entry.id) {
-                        val slot = IntOffset(
-                            ((cell % columns) * cellWidthPx).roundToInt(),
-                            ((cell / columns) * cellHeightPx).roundToInt(),
-                        )
                         AnimatedSlot(
-                            target = slot,
+                            target = slotOffset(cell),
                             initial = dropOrigin(entry.id)?.let { origin ->
-                                // The released icon's top-left → this cell's top-left.
-                                val iconInset = (cellWidthPx - with(density) { iconSize.toPx() }) / 2
-                                IntOffset((origin.x - originInWindow.x - iconInset).roundToInt(), (origin.y - originInWindow.y).roundToInt())
+                                // The released icon's top-left → this slot's start (offsets mirror in RTL).
+                                val left = origin.x - originInWindow.x - (cellWidthPx - iconPx) / 2
+                                val x = if (rtl) widthPx - left - cellWidthPx * span.columns else left
+                                IntOffset(x.roundToInt(), (origin.y - originInWindow.y).roundToInt())
                             },
-                            modifier = Modifier.size(cellWidth * spans[index].columns, cellHeight * spans[index].rows),
-                        ) { item(entry) }
+                            modifier = Modifier.size(frame.cellWidth * span.columns, frame.cellHeight * span.rows),
+                        ) { item(entry, slot) }
                     }
                 }
             }
@@ -170,7 +167,7 @@ fun IconGrid(
 
 /** A child that springs to [target] whenever it changes (starting from [initial] if given). */
 @Composable
-private fun AnimatedSlot(target: IntOffset, initial: IntOffset?, modifier: Modifier, content: @Composable () -> Unit) {
+internal fun AnimatedSlot(target: IntOffset, initial: IntOffset?, modifier: Modifier, content: @Composable () -> Unit) {
     val offset = remember { Animatable(initial ?: target, IntOffset.VectorConverter) }
     LaunchedEffect(target) { offset.animateTo(target, SlotSpring) }
     Box(modifier.offset { offset.value }, contentAlignment = Alignment.TopCenter) { content() }
@@ -178,73 +175,10 @@ private fun AnimatedSlot(target: IntOffset, initial: IntOffset?, modifier: Modif
 
 /** The drop marker glides from slot to slot instead of jumping; it appears right where it is first shown. */
 @Composable
-private fun MarkerSlot(target: IntOffset, modifier: Modifier, content: @Composable () -> Unit) {
+internal fun MarkerSlot(target: IntOffset, modifier: Modifier, content: @Composable () -> Unit) {
     val offset = remember { Animatable(target, IntOffset.VectorConverter) }
     LaunchedEffect(target) { offset.animateTo(target, SlotSpring) }
     Box(modifier.offset { offset.value }, contentAlignment = Alignment.TopCenter) { content() }
-}
-
-/**
- * The glass dock. Icons are spread evenly and slide when the dock content changes.
- * Its height follows the icon size; [background] = false leaves just the icons.
- *
- * @param onBounds receives the dock's window bounds (drag and drop target area).
- */
-@Composable
-fun DockBar(
-    entries: List<HomeEntry>,
-    modifier: Modifier = Modifier,
-    background: Boolean = true,
-    onBounds: ((Rect) -> Unit)? = null,
-    dropOrigin: (String) -> Offset? = { null },
-    marker: Pair<Int, Int>? = null,
-    item: @Composable (HomeEntry) -> Unit,
-) {
-    val density = LocalDensity.current
-    val settings = LocalSettingsState.current
-    val dockHeight = settings.dockHeight
-    BoxWithConstraints(
-        modifier
-            .fillMaxWidth()
-            .padding(start = Tokens.DockSideMargin, end = Tokens.DockSideMargin, bottom = Tokens.DockBottomMargin)
-            .height(dockHeight)
-            .then(if (background) Modifier.glass(ContinuousRoundedShape(Tokens.DockRadius)) else Modifier)
-            .onGloballyPositioned { onBounds?.invoke(it.boundsInWindow()) },
-    ) {
-        // Big icons in a 5-slot dock would touch: shrink them to fit, keeping a small gap.
-        val iconSize = min(settings.iconSize, maxWidth / settings.dockSlots - DockIconGap)
-        val widthPx = with(density) { maxWidth.toPx() }
-        val iconPx = with(density) { iconSize.toPx() }
-        val topPx = with(density) { ((dockHeight - iconSize) / 2).toPx() }
-        var originInWindow by remember { mutableStateOf(Offset.Zero) }
-        Box(Modifier.fillMaxSize().onGloballyPositioned { originInWindow = it.positionInWindow() }) {
-            val slotWidth = widthPx / entries.size.coerceAtLeast(1)
-            marker?.let { (slot, count) ->
-                val markerSlotWidth = widthPx / count.coerceAtLeast(1)
-                MarkerSlot(
-                    target = IntOffset((markerSlotWidth * slot + (markerSlotWidth - iconPx) / 2).roundToInt(), topPx.roundToInt()),
-                    modifier = Modifier.size(iconSize),
-                ) {
-                    CompositionLocalProvider(LocalSettingsState provides settings.copy(iconScale = iconSize / Tokens.IconSize)) {
-                        DropMarker(Span.One)
-                    }
-                }
-            }
-            entries.forEachIndexed { index, entry ->
-                key(entry.id) {
-                    AnimatedSlot(
-                        target = IntOffset((slotWidth * index + (slotWidth - iconPx) / 2).roundToInt(), topPx.roundToInt()),
-                        initial = dropOrigin(entry.id)?.let { IntOffset((it.x - originInWindow.x).roundToInt(), (it.y - originInWindow.y).roundToInt()) },
-                        modifier = Modifier.size(iconSize),
-                    ) {
-                        CompositionLocalProvider(LocalSettingsState provides settings.copy(iconScale = iconSize / Tokens.IconSize)) {
-                            item(entry)
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 /**
@@ -308,7 +242,7 @@ fun RemoveBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
 fun FolderIcon(
     folder: FolderEntry,
     modifier: Modifier = Modifier,
-    size: Dp = LocalSettingsState.current.iconSize,
+    size: Dp,
     highlighted: Boolean = false,
 ) {
     val shape = IconShape(LocalSettingsState.current.iconCorner)
@@ -337,14 +271,14 @@ fun FolderIcon(
 
 /** Glass squircle that appears behind an app icon when another app hovers over it (future folder). */
 @Composable
-fun MergeHalo(visible: Boolean, modifier: Modifier = Modifier) {
+fun MergeHalo(visible: Boolean, size: Dp, modifier: Modifier = Modifier) {
     val scale by animateFloatAsState(if (visible) 1.22f else 0.9f, Motion.bouncy(), label = "halo")
     val alpha by animateFloatAsState(if (visible) 1f else 0f, Motion.quickFade(), label = "haloAlpha")
     if (alpha == 0f) return
     val settings = LocalSettingsState.current
     Box(
         modifier
-            .size(settings.iconSize)
+            .size(size)
             .graphicsLayer { scaleX = scale; scaleY = scale; this.alpha = alpha }
             .glass(IconShape(settings.iconCorner), tint = Color.White.copy(alpha = 0.3f), profile = GlassProfile.Tile),
     )

@@ -8,9 +8,20 @@ import androidx.compose.ui.unit.sp
 object Tokens {
     val IconSize = 70.dp
     const val IconCornerRatio = 0.225f
-    const val GridColumns = 4
-    const val GridRows = 6
+    /** Default margins of the home grid, and the largest ones offered in settings. */
     val GridSidePadding = 22.dp
+    val GridTopPadding = 12.dp
+    val GridSideMarginMax = 48.dp
+    val GridVerticalMarginMax = 64.dp
+    /** Tallest a grid cell may get at the default icon size, so icons don't drift apart on a sparse grid. */
+    val MaxCellHeight = 112.dp
+    /** Smallest cell the grid keeps whatever the margins: a touch target. */
+    val MinCellSize = 48.dp
+    /** Smallest space between two icons side by side, and the smallest icon a narrow cell may draw. */
+    val MinIconGap = 8.dp
+    val MinIconSize = 24.dp
+    /** Columns of an App Library category, independent of the Home Screen grid. */
+    const val LibraryColumns = 4
     val LabelSize = 13.sp
 
     val DockHeight = 108.dp

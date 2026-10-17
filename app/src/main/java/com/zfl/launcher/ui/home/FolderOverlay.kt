@@ -48,7 +48,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.OpenFolder
+import com.zfl.launcher.data.GridSpec
 import com.zfl.launcher.data.Span
+import com.zfl.launcher.settings.GridMargins
+import com.zfl.launcher.settings.IconArea
+import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.data.FolderEntry
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
@@ -57,7 +61,7 @@ import com.zfl.launcher.ui.theme.Motion
 private val PanelWidth = 340.dp
 private val PanelHeight = 356.dp
 // Two full cells plus the last row's icon and label leave ~20dp of slack; split it evenly.
-private val FolderGridTopPadding = 20.dp
+private val FolderGridMargins = GridMargins(side = Tokens.GridSidePadding, top = 20.dp, bottom = 0.dp)
 private val PanelShape = ContinuousRoundedShape(40.dp)
 
 /**
@@ -147,23 +151,25 @@ fun FolderOverlay(
             ) {
                 // Rebuilt only when the folder or the drag target changes, so icons don't recompose.
                 val apps = remember(entry, drag.target, drag.draggedId) { drag.previewFolder(entry) }
-                val pages = apps.chunked(DragController.FOLDER_PAGE_SIZE).ifEmpty { listOf(emptyList()) }
+                val pages = apps.chunked(FOLDER_PAGE_SIZE).ifEmpty { listOf(emptyList()) }
                 val pager = rememberPagerState { pages.size }
                 SideEffect { drag.folderPage = pager.currentPage }
+                // The folder's own grid and icon size, whatever the Home Screen grid is.
+                val metrics = rememberAreaMetrics(LocalSettingsState.current, IconArea.Folder)
                 HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
                     IconGrid(
                         entries = pages.getOrElse(page) { emptyList() },
-                        rows = 3,
-                        columns = 3,
-                        topPadding = FolderGridTopPadding,
+                        grid = GridSpec.Folder,
+                        metrics = metrics,
+                        margins = FolderGridMargins,
                         onGeometry = if (page == pager.currentPage && isOpen) ({ drag.folderGrid = it }) else null,
                         marker = drag.folderMarker(entry)
-                            ?.takeIf { it / DragController.FOLDER_PAGE_SIZE == page }
-                            ?.let { it % DragController.FOLDER_PAGE_SIZE to Span.One },
-                    ) { app ->
+                            ?.takeIf { it / FOLDER_PAGE_SIZE == page }
+                            ?.let { it % FOLDER_PAGE_SIZE to Span.One },
+                    ) { app, slot ->
                         HomeIcon(
                             entry = app,
-                            showLabel = true,
+                            slot = slot,
                             editMode = editMode,
                             jiggleSeed = apps.indexOf(app),
                             callbacks = iconCallbacks,
