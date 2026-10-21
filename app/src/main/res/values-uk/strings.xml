@@ -357,4 +357,16 @@
     <string name="island_top_offset">Зсув по вертикалі</string>
     <string name="island_blur_footer">Розмиття працює, де Android його дозволяє: не в режимі енергозбереження і не з вимкненим розмиттям вікон.</string>
     <string name="island_access_unavailable">Екран доступу недоступний</string>
+    <string name="badges_section">Лічильники сповіщень</string>
+    <string name="badges_off">Вимк.</string>
+    <string name="badges_number">Число</string>
+    <string name="badges_dot">Крапка</string>
+    <string name="badges_access">Доступ до сповіщень</string>
+    <string name="badges_connect">Перепідключити</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d сповіщення</item>
+        <item quantity="few">%1$s, %2$d сповіщення</item>
+        <item quantity="many">%1$s, %2$d сповіщень</item>
+        <item quantity="other">%1$s, %2$d сповіщення</item>
+    </plurals>
 </resources>

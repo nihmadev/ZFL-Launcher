@@ -355,4 +355,15 @@
     <string name="island_top_offset">Décalage vertical</string>
     <string name="island_blur_footer">Le flou fonctionne là où Android le permet : pas en économiseur de batterie ni avec le flou des fenêtres désactivé.</string>
     <string name="island_access_unavailable">Cet écran d’accès est indisponible</string>
+    <string name="badges_section">Pastilles de notification</string>
+    <string name="badges_off">Désactivé</string>
+    <string name="badges_number">Nombre</string>
+    <string name="badges_dot">Point</string>
+    <string name="badges_access">Accès aux notifications</string>
+    <string name="badges_connect">Reconnecter</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d notification</item>
+        <item quantity="many">%1$s, %2$d notifications</item>
+        <item quantity="other">%1$s, %2$d notifications</item>
+    </plurals>
 </resources>

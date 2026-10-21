@@ -378,4 +378,16 @@
     <string name="folders_title_size">Размер названия папки</string>
     <string name="folders_page_indicator">Индикатор страниц</string>
     <string name="folders_app_icons">Значки и подписи приложений</string>
+    <string name="badges_section">Счётчики уведомлений</string>
+    <string name="badges_off">Выкл.</string>
+    <string name="badges_number">Число</string>
+    <string name="badges_dot">Точка</string>
+    <string name="badges_access">Доступ к уведомлениям</string>
+    <string name="badges_connect">Переподключить</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d уведомление</item>
+        <item quantity="few">%1$s, %2$d уведомления</item>
+        <item quantity="many">%1$s, %2$d уведомлений</item>
+        <item quantity="other">%1$s, %2$d уведомления</item>
+    </plurals>
 </resources>

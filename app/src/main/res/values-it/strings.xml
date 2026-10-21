@@ -355,4 +355,15 @@
     <string name="island_top_offset">Spostamento verticale</string>
     <string name="island_blur_footer">La sfocatura funziona dove Android la consente: non con il risparmio energetico né con la sfocatura delle finestre disattivata.</string>
     <string name="island_access_unavailable">Questa schermata di accesso non è disponibile</string>
+    <string name="badges_section">Badge delle notifiche</string>
+    <string name="badges_off">Disattivato</string>
+    <string name="badges_number">Numero</string>
+    <string name="badges_dot">Punto</string>
+    <string name="badges_access">Accesso alle notifiche</string>
+    <string name="badges_connect">Riconnetti</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d notifica</item>
+        <item quantity="many">%1$s, %2$d notifiche</item>
+        <item quantity="other">%1$s, %2$d notifiche</item>
+    </plurals>
 </resources>

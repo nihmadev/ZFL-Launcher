@@ -353,4 +353,14 @@
     <string name="island_top_offset">Dikey kaydırma</string>
     <string name="island_blur_footer">Bulanıklık, Android\'in izin verdiği yerde çalışır: pil tasarrufunda veya pencere bulanıklığı kapalıyken çalışmaz.</string>
     <string name="island_access_unavailable">Bu erişim ekranı kullanılamıyor</string>
+    <string name="badges_section">Bildirim Rozetleri</string>
+    <string name="badges_off">Kapalı</string>
+    <string name="badges_number">Sayı</string>
+    <string name="badges_dot">Nokta</string>
+    <string name="badges_access">Bildirim Erişimi</string>
+    <string name="badges_connect">Yeniden bağlan</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d bildirim</item>
+        <item quantity="other">%1$s, %2$d bildirim</item>
+    </plurals>
 </resources>

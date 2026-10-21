@@ -357,4 +357,16 @@
     <string name="island_top_offset">Przesunięcie w pionie</string>
     <string name="island_blur_footer">Rozmycie działa tam, gdzie pozwala Android: nie w oszczędzaniu baterii ani przy wyłączonym rozmyciu okien.</string>
     <string name="island_access_unavailable">Ten ekran dostępu jest niedostępny</string>
+    <string name="badges_section">Plakietki powiadomień</string>
+    <string name="badges_off">Wył.</string>
+    <string name="badges_number">Liczba</string>
+    <string name="badges_dot">Kropka</string>
+    <string name="badges_access">Dostęp do powiadomień</string>
+    <string name="badges_connect">Połącz ponownie</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d powiadomienie</item>
+        <item quantity="few">%1$s, %2$d powiadomienia</item>
+        <item quantity="many">%1$s, %2$d powiadomień</item>
+        <item quantity="other">%1$s, %2$d powiadomienia</item>
+    </plurals>
 </resources>

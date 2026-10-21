@@ -350,4 +350,13 @@
     <string name="island_top_offset">垂直偏移</string>
     <string name="island_blur_footer">模糊仅在 Android 允许时生效：省电模式或关闭窗口模糊时不可用。</string>
     <string name="island_access_unavailable">此访问设置页面不可用</string>
+    <string name="badges_section">通知标记</string>
+    <string name="badges_off">关闭</string>
+    <string name="badges_number">数字</string>
+    <string name="badges_dot">圆点</string>
+    <string name="badges_access">通知使用权</string>
+    <string name="badges_connect">重新连接</string>
+    <plurals name="icon_badge_description">
+        <item quantity="other">%1$s，%2$d 条通知</item>
+    </plurals>
 </resources>

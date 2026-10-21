@@ -384,4 +384,14 @@
     <string name="folders_title_size">Folder name size</string>
     <string name="folders_page_indicator">Page indicator</string>
     <string name="folders_app_icons">App icons and labels</string>
+    <string name="badges_section">Notification Badges</string>
+    <string name="badges_off">Off</string>
+    <string name="badges_number">Number</string>
+    <string name="badges_dot">Dot</string>
+    <string name="badges_access">Notification Access</string>
+    <string name="badges_connect">Reconnect</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d notification</item>
+        <item quantity="other">%1$s, %2$d notifications</item>
+    </plurals>
 </resources>

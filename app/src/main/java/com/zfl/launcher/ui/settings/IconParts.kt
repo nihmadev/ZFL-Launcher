@@ -13,6 +13,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.zfl.launcher.R
 import com.zfl.launcher.data.AppInfo
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Notifications
+import com.zfl.launcher.island.IslandGrants
+import com.zfl.launcher.settings.BadgeStyle
 import com.zfl.launcher.settings.SettingsState
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconAppearance
@@ -61,6 +65,30 @@ fun IconAppearanceRows(selected: IconAppearance, onSelect: (IconAppearance) -> U
         CheckRow(stringResource(appearance.labelRes), selected == appearance, onClick = { onSelect(appearance) })
     }
 }
+
+/**
+ * Badge style choices and, while badges are on, the one notification access the Island also
+ * uses: allowed or not, and reconnecting a granted listener the system didn't bind.
+ */
+@Composable
+fun BadgeRows(selected: BadgeStyle, grants: IslandGrants, actions: SettingsActions, onSelect: (BadgeStyle) -> Unit) {
+    BadgeStyle.entries.forEach { style ->
+        CheckRow(stringResource(style.labelRes), selected == style, onClick = { onSelect(style) })
+    }
+    if (selected == BadgeStyle.Off) return
+    NavRow(Icons.Rounded.Notifications, stringResource(R.string.badges_access), actions::requestIslandMusicAccess,
+        value = stringResource(if (grants.notifications) R.string.island_allowed else R.string.island_allow), tileColor = SettingsStyle.Tile.Red)
+    if (grants.notifications && !grants.connected) {
+        NavRow(Icons.Rounded.Notifications, stringResource(R.string.badges_connect), actions::reconnectIsland, tileColor = SettingsStyle.Tile.Red)
+    }
+}
+
+private val BadgeStyle.labelRes: Int
+    get() = when (this) {
+        BadgeStyle.Off -> R.string.badges_off
+        BadgeStyle.Number -> R.string.badges_number
+        BadgeStyle.Dot -> R.string.badges_dot
+    }
 
 private val IconAppearance.labelRes: Int
     get() = when (this) {

@@ -357,4 +357,16 @@
     <string name="island_top_offset">Зрух па вертыкалі</string>
     <string name="island_blur_footer">Размыццё працуе, дзе Android яго дазваляе: не ў рэжыме эканоміі зараду і не з адключаным размыццём вокнаў.</string>
     <string name="island_access_unavailable">Экран доступу недаступны</string>
+    <string name="badges_section">Лічыльнікі апавяшчэнняў</string>
+    <string name="badges_off">Выкл.</string>
+    <string name="badges_number">Лік</string>
+    <string name="badges_dot">Кропка</string>
+    <string name="badges_access">Доступ да апавяшчэнняў</string>
+    <string name="badges_connect">Перападключыць</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d апавяшчэнне</item>
+        <item quantity="few">%1$s, %2$d апавяшчэнні</item>
+        <item quantity="many">%1$s, %2$d апавяшчэнняў</item>
+        <item quantity="other">%1$s, %2$d апавяшчэння</item>
+    </plurals>
 </resources>

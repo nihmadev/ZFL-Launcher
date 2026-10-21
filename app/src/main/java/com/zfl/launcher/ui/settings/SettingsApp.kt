@@ -79,7 +79,7 @@ fun SettingsApp(vm: SettingsViewModel, actions: SettingsActions, initialRoute: S
             SettingsRoute.Transition -> TransitionSettingsScreen(vm, back)
             SettingsRoute.Animations -> AnimationSettingsScreen(vm, back)
             SettingsRoute.Glass -> GlassSettingsScreen(vm, actions, back)
-            SettingsRoute.Icons -> IconSettingsScreen(vm, onOpenArea = { navigate(it.route) }, onBack = back)
+            SettingsRoute.Icons -> IconSettingsScreen(vm, actions, onOpenArea = { navigate(it.route) }, onBack = back)
             SettingsRoute.HomeIcons -> AreaIconsScreen(vm, IconArea.Home, back)
             SettingsRoute.DockIcons -> AreaIconsScreen(vm, IconArea.Dock, back)
             SettingsRoute.FolderIcons -> AreaIconsScreen(vm, IconArea.Folder, back)

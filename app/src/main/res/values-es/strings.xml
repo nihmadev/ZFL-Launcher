@@ -355,4 +355,15 @@
     <string name="island_top_offset">Desplazamiento vertical</string>
     <string name="island_blur_footer">El desenfoque funciona donde Android lo permite: no en ahorro de batería ni con el desenfoque de ventanas desactivado.</string>
     <string name="island_access_unavailable">Esta pantalla de acceso no está disponible</string>
+    <string name="badges_section">Globos de notificación</string>
+    <string name="badges_off">Desactivado</string>
+    <string name="badges_number">Número</string>
+    <string name="badges_dot">Punto</string>
+    <string name="badges_access">Acceso a notificaciones</string>
+    <string name="badges_connect">Reconectar</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d notificación</item>
+        <item quantity="many">%1$s, %2$d notificaciones</item>
+        <item quantity="other">%1$s, %2$d notificaciones</item>
+    </plurals>
 </resources>

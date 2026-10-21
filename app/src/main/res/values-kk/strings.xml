@@ -353,4 +353,14 @@
     <string name="island_top_offset">Тік ығысу</string>
     <string name="island_blur_footer">Бұлдырату Android рұқсат еткенде жұмыс істейді: батареяны үнемдеу режимінде және терезе бұлдыратуы өшірілгенде емес.</string>
     <string name="island_access_unavailable">Рұқсаттар экраны қолжетімсіз</string>
+    <string name="badges_section">Хабарландыру белгілері</string>
+    <string name="badges_off">Өшірулі</string>
+    <string name="badges_number">Сан</string>
+    <string name="badges_dot">Нүкте</string>
+    <string name="badges_access">Хабарландыруларға рұқсат</string>
+    <string name="badges_connect">Қайта қосылу</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d хабарландыру</item>
+        <item quantity="other">%1$s, %2$d хабарландыру</item>
+    </plurals>
 </resources>

@@ -350,4 +350,13 @@
     <string name="island_top_offset">縦方向の位置</string>
     <string name="island_blur_footer">ぼかしは Android が許可する場合に有効です（バッテリーセーバー中やウィンドウのぼかしがオフの場合は無効）。</string>
     <string name="island_access_unavailable">このアクセス設定画面を利用できません</string>
+    <string name="badges_section">通知バッジ</string>
+    <string name="badges_off">オフ</string>
+    <string name="badges_number">数字</string>
+    <string name="badges_dot">ドット</string>
+    <string name="badges_access">通知へのアクセス</string>
+    <string name="badges_connect">再接続</string>
+    <plurals name="icon_badge_description">
+        <item quantity="other">%1$s、通知%2$d件</item>
+    </plurals>
 </resources>

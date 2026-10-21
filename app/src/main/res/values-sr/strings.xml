@@ -355,4 +355,15 @@
     <string name="island_top_offset">Вертикални помак</string>
     <string name="island_blur_footer">Замућење ради где га Android дозвољава: не у уштеди батерије нити са искљученим замућењем прозора.</string>
     <string name="island_access_unavailable">Овај екран приступа није доступан</string>
+    <string name="badges_section">Бројачи обавештења</string>
+    <string name="badges_off">Искључено</string>
+    <string name="badges_number">Број</string>
+    <string name="badges_dot">Тачка</string>
+    <string name="badges_access">Приступ обавештењима</string>
+    <string name="badges_connect">Поново повежи</string>
+    <plurals name="icon_badge_description">
+        <item quantity="one">%1$s, %2$d обавештење</item>
+        <item quantity="few">%1$s, %2$d обавештења</item>
+        <item quantity="other">%1$s, %2$d обавештења</item>
+    </plurals>
 </resources>
