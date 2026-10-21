@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.zfl.launcher.R
 import com.zfl.launcher.settings.AreaStyle
+import com.zfl.launcher.settings.FolderPreferences
 import com.zfl.launcher.settings.IconArea
 import com.zfl.launcher.settings.SettingsState
 
@@ -104,7 +105,8 @@ fun AreaIconRows(settings: SettingsState, onOpen: (IconArea) -> Unit) {
             area.icon,
             stringResource(area.titleRes),
             onClick = { onOpen(area) },
-            value = if (settings.style(area).isInherited) null else stringResource(R.string.area_custom),
+            value = if (!settings.style(area).isInherited || (area == IconArea.Folder && settings.folders != FolderPreferences()))
+                stringResource(R.string.area_custom) else null,
         )
     }
 }
