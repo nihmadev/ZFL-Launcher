@@ -28,6 +28,9 @@ jobs:
           java-version: "17"
 
       - uses: android-actions/setup-android@v3
+        # The default package list includes the removed legacy "tools" package.
+        with:
+          packages: platform-tools
 
       # Validates the wrapper checksum and caches Gradle; only main writes the cache.
       - uses: gradle/actions/setup-gradle@v4
