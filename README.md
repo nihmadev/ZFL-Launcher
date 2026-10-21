@@ -140,6 +140,58 @@ before launch. Haptics controls ZFL's lift, tick, threshold and switch feedback,
 including the long press created by its widget host; platform haptic preferences
 still apply. It does not control vibration inside another app or widget.
 
+## Island
+
+**Settings → Island** enables an optional music capsule above other apps. It is off
+on fresh installs and updates. Grant **Display over other apps** and **Notification
+access for music** using the buttons on that page. Returning from a permission
+screen rechecks the actual grants; leaving or cancelling the screen grants nothing.
+The music button opens Android's special notification-access list. On Android 13+
+an APK installation can additionally be blocked by Restricted Settings; this must
+be allowed in the system's app information UI before notification access can be
+enabled. ZFL cannot grant this access itself.
+Charging events also require the music listener to be connected.
+
+The system-bound `IslandListenerService` owns a single `TYPE_APPLICATION_OVERLAY`
+window, independently of Home. No foreground service or background Activity launch
+keeps it alive. With Island off, it has no media subscriptions, receivers or window.
+The system and OEM control listener binding; force-stop and battery restrictions
+are respected, so automatic startup is not guaranteed.
+
+Compatible platform MediaSessions provide the artwork, title, artist, playback
+state and supported play/pause/previous/next controls. Sessions retain their token
+identity, including multiple sessions from one player. Playing sessions take
+priority; within a priority the current session is retained. Paused music remains
+for 30 seconds. Tap the capsule to expand; use the collapse button or wait 12 seconds.
+Seek is enabled only with a known position, duration and seek action. Otherwise a
+known position is an indicator. Tapping the artwork/title opens the player only
+when its session provides an Activity PendingIntent; Android launch restrictions
+still apply, and a platform-blocked launch may not report a failure to ZFL.
+
+Optional charging indication shows a new unplugged-to-plugged transition for four
+seconds. The initial battery snapshot is a baseline, and repeated broadcasts do
+not extend it. Charging cannot interrupt expanded music controls. Screen off,
+Keyguard, disabled settings and revoked access remove the window and cancel delayed
+presentation. Unlock starts compact with live data. Runtime data is not saved.
+
+The window stays below the status bar/cutout, leaves other apps focused, and uses
+only the bounds of the capsule/card. Collapse is explicit or timed; there is no
+full-screen outside-touch catcher. Landscape uses the compact presentation;
+insufficient space hides Island. Apps that hide overlays and protected system
+surfaces remain outside its control.
+
+Island reuses ZFL's glass contour and highlight with a readable translucent dark
+body. It does not sample wallpaper or capture/blur another app. Artwork is limited
+to an owned 192-pixel thumbnail (at most 144 KiB of ARGB pixels), decoded off the
+main thread from session bitmaps; artwork URIs are never loaded. Only visible,
+expanded progress ticks at 1 Hz while playback advances. No sensor or animation
+loop runs in a settled capsule.
+
+The first implementation has JVM policy/regression coverage, but its Android
+window lifecycle, player interoperability, touch behavior, morph appearance and
+idle/frame performance still require validation on a connected device. It does
+not integrate calls, messages, navigation, third-party timers or other notifications.
+
 ## Privacy comes with it
 
 No advertising SDKs, trackers, analytics, crash reporters, Firebase, or Google Play
@@ -154,6 +206,10 @@ On Android 13+, wallpaper blur needs **All files access** to read the wallpaper
 bitmap. ZFL uses that permission only for the wallpaper; it does not scan, read,
 or write your personal files. Without it, glass surfaces use a translucent tint.
 Calendar access is requested when you choose to show upcoming events in a widget.
+Island's optional notification access is used only to query/control MediaSessions;
+notification delivery types are filtered out and ordinary notification payloads
+are not read. It stores no tracks, session tokens, PendingIntents or artwork, and
+does not use the network. Overlay access is used only for the Island window.
 
 ## Try it
 
