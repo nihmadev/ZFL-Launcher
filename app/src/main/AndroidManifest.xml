@@ -30,6 +30,37 @@
         android:theme="@style/Theme.ZFL"
         tools:targetApi="33">
 
+        <!-- System-bound only. Notification access authorizes MediaSession queries and shows clock
+             activities (running timers, stopwatches, ringing alarms); other notifications are ignored
+             and nothing is stored. No started service or foreground playback service. -->
+        <!-- Optional Island, enabled by the user: owns the one window around the camera. An
+             accessibility overlay is the only window above the status bar, where the capsule must
+             be touchable. It receives no events, cannot read the screen and performs no actions. -->
+        <service
+            android:name=".island.IslandWindowService"
+            android:label="@string/island_title"
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/island_window_service" />
+        </service>
+
+        <service
+            android:name=".island.IslandListenerService"
+            android:label="@string/island_title"
+            android:exported="false"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+            <!-- Music comes from MediaSessionManager. Timers are ongoing, ringing alarms alerting;
+                 conversations and silent notifications are never delivered. -->
+            <meta-data android:name="android.service.notification.default_filter_types" android:value="ongoing|alerting" />
+            <meta-data android:name="android.service.notification.disabled_filter_types" android:value="conversations|silent" />
+        </service>
+
         <!-- The home screen is a fixed portrait grid, like iOS: it never rotates and is never shown
              in split screen. Android 16 ignores this only on large screens (600dp+). -->
 
