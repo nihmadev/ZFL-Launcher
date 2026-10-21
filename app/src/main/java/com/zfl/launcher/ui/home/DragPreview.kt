@@ -5,15 +5,13 @@ import com.zfl.launcher.data.DropPosition
 import com.zfl.launcher.data.FolderEntry
 import com.zfl.launcher.data.HomeEntry
 import com.zfl.launcher.data.PlaceholderEntry
-import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.boundedCell
 import com.zfl.launcher.data.cascadePages
-import com.zfl.launcher.data.packCells
 import com.zfl.launcher.data.span
 
 /*
- * What the screen shows while dragging: the layout with a gap where the item would land, and
- * the drop marker. Placed with the same grid and reservations as the move that the drop saves.
+ * What the screen shows while dragging: the layout with a gap where the item would land, like
+ * iOS. Placed with the same grid and reservations as the move that the drop saves.
  */
 
 fun DragController.previewPages(position: DropPosition? = target): List<List<HomeEntry>> {
@@ -31,7 +29,7 @@ fun DragController.previewPages(position: DropPosition? = target): List<List<Hom
     return cascadePages(pages, state.grid, dropEmpty = false, cell = { cells[it.id] }) { it.span }
 }
 
-/** The marker and preview use the same reservations as the persisted move. */
+/** The preview uses the same reservations as the persisted move. */
 fun DragController.previewCells(position: DropPosition? = target): Map<String, Int> {
     val dragged = session?.takeIf { it.active }?.entry ?: return state.cells
     val rest = state.cells - dragged.id
@@ -52,29 +50,4 @@ fun DragController.previewFolder(folder: FolderEntry, position: DropPosition? = 
         apps.add(it.index.coerceIn(0, apps.size), PlaceholderEntry())
     }
     return apps
-}
-
-/** Cell and footprint of the drop marker on home [page], or null if it is elsewhere. */
-fun DragController.pageMarker(page: Int): Pair<Int, Span>? {
-    val t = markerTarget as? DropPosition.PageCell ?: return null
-    if (t.page != page) return null
-    val items = previewPages(t).getOrNull(page) ?: return null
-    val index = items.indexOfFirst { it is PlaceholderEntry }.takeIf { it >= 0 } ?: return null
-    val spans = items.map { it.span }
-    val positions = previewCells(t)
-    val cell = packCells(spans, state.grid, items.map { positions[it.id] })[index] ?: return null
-    return cell to spans[index]
-}
-
-/** Dock slot of the drop marker and the number of slots it is spread over. */
-fun DragController.dockMarker(): Pair<Int, Int>? {
-    val t = markerTarget as? DropPosition.Dock ?: return null
-    val items = previewDock(t)
-    return items.indexOfFirst { it is PlaceholderEntry }.takeIf { it >= 0 }?.let { it to items.size }
-}
-
-/** Index of the drop marker among [folder]'s apps. */
-fun DragController.folderMarker(folder: FolderEntry): Int? {
-    val t = markerTarget as? DropPosition.InFolder ?: return null
-    return previewFolder(folder, t).indexOfFirst { it is PlaceholderEntry }.takeIf { it >= 0 }
 }

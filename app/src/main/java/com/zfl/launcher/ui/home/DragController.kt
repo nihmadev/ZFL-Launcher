@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 internal val FOLDER_PAGE_SIZE: Int = GridSpec.Folder.cellCount
 
 /** Where a dragged item was picked up. */
-enum class DragSource { Page, Dock, Folder }
+enum class DragSource { Page, Dock, Folder, Library }
 
 /** An item being dragged. [pointer] is in window coordinates. */
 @Stable
@@ -65,7 +65,9 @@ class DragController(
     private val slopPx: Float,
     private val edgePx: Float,
     private val callbacks: Callbacks,
+    pageSwipePx: Float = slopPx,
 ) {
+    private val pointers = DragPointers(slopPx, pageSwipePx)
     interface Callbacks {
         /** The finger moved after a long-press: close the menu and enter edit mode. */
         fun onDragActivated()
@@ -90,6 +92,7 @@ class DragController(
 
     // Inputs kept up to date by the screen.
     var state: HomeState = HomeState()
+    var pageMap: HomePages = HomePages(1, today = false, library = false)
     /** Home page under the finger; -1 for the Today page. */
     var currentPage: Int = 0
     var screenWidth: Float = 0f
@@ -97,6 +100,8 @@ class DragController(
     var rtl: Boolean = false
     var openFolder: FolderEntry? = null
     var pageGrid: GridGeometry? = null
+    /** Hit testing supplied by the visible App Library grid, in window coordinates. */
+    val libraryTargets: MutableMap<Any, (Offset) -> DropPosition.Library?> = linkedMapOf()
     var dockBounds: Rect? = null
     /** Dock slots chosen in settings. */
     var dockCapacity: Int = DEFAULT_DOCK_CAPACITY
@@ -106,7 +111,7 @@ class DragController(
 
     private var mergeJob: Job? = null
     private var reorderJob: Job? = null
-    /** Latest slot under the finger; icons move there only after a rest, the drop marker at once. */
+    /** Latest slot under the finger; icons make room there after a short dwell. */
     var pendingTarget: DropPosition? by mutableStateOf(null)
         private set
     private var restPoint: Offset = Offset.Zero
@@ -117,33 +122,51 @@ class DragController(
     val isDragging: Boolean get() = session?.active == true
     val draggedId: String? get() = session?.takeIf { it.active }?.entry?.id
 
-    /** Where the item lands if released now (no marker while it would make a folder). */
-    internal val markerTarget: DropPosition?
-        get() = if (session?.active != true || mergeCandidate != null) null else pendingTarget ?: target
-
     /** Long-press in normal mode: remember the item; dragging begins only if the finger moves. */
     fun prepare(entry: HomeEntry, source: DragSource, iconBounds: Rect, pointer: Offset) {
+        pointers.bind(pointer)
         session = DragSession(entry, source, pointer - iconBounds.topLeft, pointer, iconBounds.size)
     }
 
     /** Edit mode: the finger already moved past the touch slop, so drag right away. */
     fun start(entry: HomeEntry, source: DragSource, iconBounds: Rect, pointer: Offset) {
+        pointers.bind(pointer)
         session = DragSession(entry, source, pointer - iconBounds.topLeft, pointer, iconBounds.size).also { it.active = true }
         target = initialTarget(entry, source)
     }
 
     /** Root pointer handler (Initial pass). Consumes events while a drag is in progress. */
     fun onPointerEvent(event: PointerEvent) {
+        pointers.observe(event)
         val s = session ?: return
-        val change = event.changes.firstOrNull() ?: return
+        val change = pointers.primary() ?: run { cancel(); return }
         if (!change.pressed) {
-            if (s.active) drop(s) else session = null
+            if (s.active) drop(s) else reset()
             return
+        }
+        val swipe = pointers.swipe(s.active && openFolder == null)
+        if (pointers.hasSecondary) cancelEdgeFlip()
+        if (swipe != 0) {
+            val direction = if (rtl) -swipe else swipe
+            pageMap.dragNeighbor(currentPage, direction, s.entry is AppEntry)?.let { next ->
+                reorderJob?.cancel()
+                pendingTarget = null
+                target = null
+                setMerge(null)
+                pageGrid = null
+                currentPage = next
+                callbacks.onFlipPage(next)
+            }
         }
         s.pointer = change.position
         if (!s.active && (change.position - s.start).getDistance() > slopPx) {
             s.active = true
             target = initialTarget(s.entry, s.source)
+            if (s.source == DragSource.Library) {
+                currentPage = state.pages.lastIndex
+                // Wait for the destination page to be laid out after leaving the library.
+                pageGrid = null
+            }
             callbacks.onDragActivated()
         }
         if (s.active) updateTarget(s)
@@ -155,6 +178,7 @@ class DragController(
         dropOrigin?.takeIf { it.first == id }?.second?.also { dropOrigin = null }
 
     private fun initialTarget(entry: HomeEntry, source: DragSource): DropPosition? = when (source) {
+        DragSource.Library -> null
         DragSource.Folder -> openFolder?.let { folder ->
             DropPosition.InFolder(folder.id, folder.apps.indexOfFirst { it.key == entry.id }.coerceAtLeast(0))
         }
@@ -166,6 +190,19 @@ class DragController(
 
     private fun updateTarget(s: DragSession) {
         val p = s.hotspot
+        if (pageMap.library && currentPage == pageMap.homeCount) {
+            setMerge(null)
+            val position = if (s.entry is AppEntry) libraryTargets.values.lastOrNull()?.invoke(p) else null
+            reorderJob?.cancel()
+            pendingTarget = position
+            target = position
+            handlePageEdge(s.pointer)
+            return
+        }
+        // A library destination must never survive a return to a home page.
+        if (target is DropPosition.Library) target = null
+        if (pendingTarget is DropPosition.Library) retarget(null)
+        if (openFolder == null && pageGrid == null) return
 
         // 1. Inside an open folder.
         val folder = openFolder
@@ -238,9 +275,20 @@ class DragController(
             }
             else -> {
                 setMerge(null)
-                retarget(destination, REORDER_OVER_ICON_DELAY_MS)
+                retarget(destination, REORDER_OVER_ICON_DELAY_MS, untilRest = true)
             }
         }
+    }
+
+    /** Refreshes the destination after a page handoff, even if the finger is held still. */
+    fun updatePageGrid(grid: GridGeometry) {
+        pageGrid = grid
+        session?.takeIf { it.active }?.let(::updateTarget)
+    }
+
+    /** Rechecks stationary drags after the library lays out or scrolls its cells. */
+    fun refreshTarget() {
+        session?.takeIf { it.active }?.let(::updateTarget)
     }
 
     private fun updateDockTarget(s: DragSession, dock: Rect, p: Offset) {
@@ -265,22 +313,20 @@ class DragController(
             return
         }
         setMerge(null)
-        if (canInsert) retarget(
-            DropPosition.Dock(slot),
-            if (under != null && under !is PlaceholderEntry) REORDER_OVER_ICON_DELAY_MS else REORDER_DELAY_MS,
-        )
+        val overIcon = under != null && under !is PlaceholderEntry
+        if (canInsert) retarget(DropPosition.Dock(slot), if (overIcon) REORDER_OVER_ICON_DELAY_MS else REORDER_DELAY_MS, overIcon)
     }
 
     /**
-     * Icons make room only after the finger rests on a new slot for a moment, like iOS.
-     * Without this delay icons would slide away before you could reach their center
-     * to make a folder. `null` cancels a pending change and keeps the current target.
+     * Icons make room once the slot under the finger has stayed the same for a short dwell,
+     * like iOS: sweeping across the grid doesn't shuffle everything, a slow drag reflows as it
+     * goes. Over an icon ([untilRest]) the finger must also stop, so icons don't slide away
+     * before you reach their center to make a folder. `null` cancels a pending change.
      */
-    private fun retarget(position: DropPosition?, delayMs: Long = REORDER_DELAY_MS) {
+    private fun retarget(position: DropPosition?, delayMs: Long = REORDER_DELAY_MS, untilRest: Boolean = false) {
         val pointer = session?.pointer ?: return
-        // Any real movement postpones the reflow: icons only make room once the finger rests.
-        val moved = (pointer - restPoint).getDistance() > slopPx / 2
-        if (moved) restPoint = pointer
+        val moved = untilRest && (pointer - restPoint).getDistance() > slopPx / 2
+        if (moved || position != pendingTarget) restPoint = pointer
         if (position == pendingTarget && !moved) return
         pendingTarget = position
         reorderJob?.cancel()
@@ -318,6 +364,7 @@ class DragController(
 
     /** Holding the item at the left/right screen edge flips to the neighbor page. */
     private fun handlePageEdge(p: Offset) {
+        if (pointers.hasSecondary) { cancelEdgeFlip(); return }
         val side = when {
             p.x < edgePx -> -1
             p.x > screenWidth - edgePx -> 1
@@ -333,9 +380,7 @@ class DragController(
         edgeJob = scope.launch {
             while (true) {
                 delay(EDGE_FLIP_DELAY_MS)
-                val next = currentPage + direction
-                // Never flip into the Today page (-1) while dragging.
-                if (next < 0 || next >= previewPages().size) break
+                val next = pageMap.dragNeighbor(currentPage, direction, session?.entry is AppEntry) ?: break
                 callbacks.onFlipPage(next)
                 currentPage = next
                 session?.let { if (it.active) updateTarget(it) }
@@ -357,7 +402,7 @@ class DragController(
 
     private fun drop(s: DragSession) {
         val position = if (mergeArmed) mergeCandidate?.let { DropPosition.Merge(it) } else null
-        // Land where the marker shows, even if the icons haven't made room yet.
+        // Land on the slot under the item, even if the icons haven't made room yet.
         val finalPosition = position ?: pendingTarget ?: target
         dropOrigin = s.entry.id to (s.pointer - s.touchOffset)
         reset()
@@ -365,6 +410,7 @@ class DragController(
     }
 
     private fun reset() {
+        pointers.reset()
         reorderJob?.cancel()
         pendingTarget = null
         session = null
@@ -381,10 +427,10 @@ class DragController(
         /** A picked folder target is kept until the dragged icon moves this far away. */
         private const val MERGE_EXIT_RADIUS = 0.8f
         private const val MERGE_DELAY_MS = 200L
-        /** Rest needed to reflow over empty space. */
-        private const val REORDER_DELAY_MS = 180L
+        /** Dwell on an empty slot before icons make room. */
+        private const val REORDER_DELAY_MS = 70L
         /** Rest needed to push aside an icon the dragged one only partly covers. */
-        private const val REORDER_OVER_ICON_DELAY_MS = 380L
+        private const val REORDER_OVER_ICON_DELAY_MS = 220L
         private const val EDGE_FLIP_DELAY_MS = 550L
         private const val LEAVE_FOLDER_DELAY_MS = 350L
     }
