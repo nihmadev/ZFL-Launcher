@@ -30,9 +30,10 @@
         android:theme="@style/Theme.ZFL"
         tools:targetApi="33">
 
-        <!-- System-bound only. Notification access authorizes MediaSession queries and shows clock
-             activities (running timers, stopwatches, ringing alarms); other notifications are ignored
-             and nothing is stored. No started service or foreground playback service. -->
+        <!-- System-bound only. Notification access authorizes MediaSession queries, shows clock
+             activities (running timers, stopwatches, ringing alarms) in the Island and, when turned
+             on, counts notifications per app for icon badges (package, user and flags only; no text
+             is read). Nothing is stored. No started service or foreground playback service. -->
         <!-- Optional Island, enabled by the user: owns the one window around the camera. An
              accessibility overlay is the only window above the status bar, where the capsule must
              be touchable. It receives no events, cannot read the screen and performs no actions. -->
@@ -55,10 +56,11 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
-            <!-- Music comes from MediaSessionManager. Timers are ongoing, ringing alarms alerting;
-                 conversations and silent notifications are never delivered. -->
-            <meta-data android:name="android.service.notification.default_filter_types" android:value="ongoing|alerting" />
-            <meta-data android:name="android.service.notification.disabled_filter_types" android:value="conversations|silent" />
+            <!-- Every type: badges count messages (conversations) and quiet notifications (silent);
+                 timers are ongoing, ringing alarms alerting. Each consumer filters in code. The
+                 system keeps the types stored for an existing grant; the user changes them on the
+                 listener's page in system settings. -->
+            <meta-data android:name="android.service.notification.default_filter_types" android:value="conversations|alerting|silent|ongoing" />
         </service>
 
         <!-- The home screen is a fixed portrait grid, like iOS: it never rotates and is never shown
