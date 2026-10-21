@@ -70,6 +70,7 @@ data class SettingsState(
     val homeStyle: AreaStyle = AreaStyle.Inherit,
     val dockStyle: AreaStyle = AreaStyle.Inherit,
     val folderStyle: AreaStyle = AreaStyle.Inherit,
+    val folders: FolderPreferences = FolderPreferences(),
     /** Default, Dark, Tinted or Auto (Default/Dark following the system theme). */
     val iconAppearance: IconAppearance = IconAppearance.Default,
     /** Tinted icons take their hue from the wallpaper instead of [iconTintColor]. */
@@ -108,6 +109,9 @@ data class SettingsState(
 
     /** Accent color of buttons, switches and sliders taken from the wallpaper (Dynamic Color). */
     val dynamicColor: Boolean = false,
+
+    /** Optional music/charging window; access is checked separately at runtime. */
+    val island: IslandPreferences = IslandPreferences(),
 
     /** The first-run setup was finished with "Get Started" (or the install predates it, see [isOnboardingNeeded]). */
     val onboardingDone: Boolean = false,
@@ -167,6 +171,7 @@ data class SettingsState(
         homeStyle = homeStyle.sanitized(),
         dockStyle = dockStyle.sanitized(),
         folderStyle = folderStyle.sanitized(),
+        folders = folders.sanitized(),
         glassTint = glassTint.coerceIn(0f, MAX_GLASS_TINT),
         glassRefraction = if (glassRefraction.isNaN()) DEFAULT_GLASS_REFRACTION else glassRefraction.coerceIn(0f, 1f),
         homeBlurRadius = homeBlurRadius.coerceIn(MIN_HOME_BLUR, MAX_HOME_BLUR),

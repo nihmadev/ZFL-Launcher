@@ -76,6 +76,7 @@ class LauncherSettings private constructor(context: Context) {
             putFloat(KEY_ICON_CORNER, next.iconCorner)
             putBoolean(KEY_SHOW_LABELS, next.showLabels)
             IconArea.entries.forEach { putAreaStyle(it, next.style(it)) }
+            putFolders(next.folders)
             putString(KEY_ICON_APPEARANCE, next.iconAppearance.name)
             putBoolean(KEY_ICON_TINT_WALLPAPER, next.iconTintFromWallpaper)
             putInt(KEY_ICON_TINT_COLOR, next.iconTintColor)
@@ -91,6 +92,7 @@ class LauncherSettings private constructor(context: Context) {
             putString(KEY_LIBRARY, next.library.toJson())
             putStringSet(KEY_HIDDEN_MENU, next.hiddenMenuActions.map { it.name }.toSet())
             putBoolean(KEY_DYNAMIC_COLOR, next.dynamicColor)
+            putIsland(next.island)
             putBoolean(KEY_ONBOARDING_DONE, next.onboardingDone)
         }
     }
@@ -200,6 +202,7 @@ class LauncherSettings private constructor(context: Context) {
         homeStyle = readAreaStyle(IconArea.Home),
         dockStyle = readAreaStyle(IconArea.Dock),
         folderStyle = readAreaStyle(IconArea.Folder),
+        folders = FolderPreferences.fromStored(prefs.all),
         iconAppearance = IconAppearance.fromStored(prefs.getString(KEY_ICON_APPEARANCE, null)),
         iconTintFromWallpaper = prefs.getBoolean(KEY_ICON_TINT_WALLPAPER, Defaults.iconTintFromWallpaper),
         iconTintColor = prefs.getInt(KEY_ICON_TINT_COLOR, Defaults.iconTintColor),
@@ -219,6 +222,7 @@ class LauncherSettings private constructor(context: Context) {
         customLabels = readJsonMap(KEY_LABELS) { obj, key -> obj.getString(key) },
         customIcons = readJsonMap(KEY_ICONS) { obj, key -> obj.getLong(key) },
         dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, Defaults.dynamicColor),
+        island = IslandPreferences.fromStored(prefs.all),
         onboardingDone = prefs.getBoolean(KEY_ONBOARDING_DONE, Defaults.onboardingDone),
     )
 
