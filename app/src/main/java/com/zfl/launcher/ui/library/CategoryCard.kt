@@ -38,6 +38,8 @@ import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.home.DragController
 import com.zfl.launcher.ui.home.DropMarker
 import com.zfl.launcher.ui.icon.AppIconImage
+import com.zfl.launcher.ui.icon.IconBadge
+import com.zfl.launcher.ui.icon.groupBadgeModifier
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
 import kotlinx.coroutines.delay
@@ -102,7 +104,7 @@ internal fun CategoryCard(
                 ))
             }
             if (cluster) {
-                MiniCluster(preview.drop(3).take(4), big, onOpenGroup,
+                MiniCluster(preview.drop(3).take(4), group.apps.drop(3), group.title, big, onOpenGroup,
                     Modifier.offset(x = CardPadding + big + CardGap, y = CardPadding + big + CardGap))
             }
         }
@@ -121,10 +123,12 @@ private fun CardApp(app: AppInfo?, size: Dp, callbacks: LibraryCallbacks, modifi
 
 /** A tiny insertion marker uses the same mini slot the saved app will occupy. */
 @Composable
-private fun MiniCluster(apps: List<AppInfo?>, size: Dp, onClick: () -> Unit, modifier: Modifier) {
+private fun MiniCluster(apps: List<AppInfo?>, behind: List<AppInfo>, title: String, size: Dp, onClick: () -> Unit, modifier: Modifier) {
     val gap = size * 0.1f
     val mini = (size - gap) / 2
-    Box(modifier.size(size).clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick)) {
+    // Like a folder: the cluster carries the sum of the apps [behind] it.
+    val badged = groupBadgeModifier(behind, title, IconBadge.Shown)
+    Box(modifier.size(size).then(badged).clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick)) {
         apps.forEachIndexed { index, app ->
             val slot = Modifier.offset(x = (mini + gap) * (index % 2), y = (mini + gap) * (index / 2))
             if (app == null) DropMarker(mini, slot.size(mini))

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.data.LetterSection
 import com.zfl.launcher.ui.icon.AppIconImage
+import com.zfl.launcher.ui.icon.IconBadge
 import com.zfl.launcher.ui.theme.Haptics
 import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.ui.theme.Tokens
@@ -170,7 +171,7 @@ internal fun AppListRow(app: AppInfo, callbacks: LibraryCallbacks) {
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AppIconImage(app, size = ListIconSize, modifier = bounds.modifier)
+        AppIconImage(app, size = ListIconSize, modifier = bounds.modifier, badge = IconBadge.Shown)
         Spacer(Modifier.width(16.dp))
         Text(app.label, color = Tokens.TextPrimary, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }

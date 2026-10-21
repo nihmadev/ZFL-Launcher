@@ -25,6 +25,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
+import com.zfl.launcher.R
+import com.zfl.launcher.settings.BadgeStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -43,6 +46,8 @@ val LocalIconLoader = staticCompositionLocalOf<IconLoader> { error("IconLoader n
  *
  * @param renderSize size of the bitmap when [size] changes every frame (a slider preview):
  *   the saved size, so dragging doesn't render a bitmap per frame.
+ * @param badge whether the app's notification badge is drawn (see [LocalBadges]); the count is
+ *   also read out with the name.
  */
 @Composable
 fun AppIconImage(
@@ -51,6 +56,7 @@ fun AppIconImage(
     size: Dp = LocalSettingsState.current.iconSize,
     dimmed: Boolean = false,
     renderSize: Dp = size,
+    badge: IconBadge = IconBadge.None,
 ) {
     val loader = LocalIconLoader.current
     val sizePx = with(LocalDensity.current) { renderSize.roundToPx() }.coerceAtLeast(1)
@@ -69,7 +75,9 @@ fun AppIconImage(
             slot.key = cacheKey
         }
     }
-    val label = app.label
+    val badges = LocalBadges.current.takeIf { badge != IconBadge.None }
+    val count = if (badges != null && badge == IconBadge.Shown) badgeCount(badges, app.badgeKey) else 0
+    val label = if (count > 0) pluralStringResource(R.plurals.icon_badge_description, count, app.label, count) else app.label
     Spacer(
         modifier
             .size(size)
@@ -77,6 +85,7 @@ fun AppIconImage(
                 contentDescription = label
                 role = Role.Image
             }
+            .then(if (badges != null) Modifier.notificationBadge(count, badges.style == BadgeStyle.Dot) else Modifier)
             // The bitmap is read in the draw phase: loading it only redraws, never recomposes.
             .drawBehind {
                 val image = slot.bitmap ?: return@drawBehind

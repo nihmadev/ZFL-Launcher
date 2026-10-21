@@ -51,6 +51,7 @@ import com.zfl.launcher.data.LibraryView
 import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
+import com.zfl.launcher.ui.icon.IconBadge
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.theme.Haptics
 import com.zfl.launcher.ui.theme.Tokens
@@ -184,6 +185,7 @@ internal fun LibraryIcon(app: AppInfo, size: Dp, callbacks: LibraryCallbacks, mo
         app = app,
         size = size,
         dimmed = pressed,
+        badge = IconBadge.Shown,
         modifier = modifier
             .then(bounds.modifier)
             .pointerInput(Unit) {

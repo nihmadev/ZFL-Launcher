@@ -30,6 +30,7 @@ import com.zfl.launcher.data.HomeEntry
 import com.zfl.launcher.data.WidgetEntry
 import com.zfl.launcher.data.PlaceholderEntry
 import com.zfl.launcher.ui.icon.AppIconImage
+import com.zfl.launcher.ui.icon.IconBadge
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.theme.Haptics
 
@@ -48,7 +49,7 @@ interface HomeIconCallbacks {
  * [slot] of its area (icon size, touch width and name).
  *
  * Normal mode: tap opens, long-press shows the menu. Edit mode: icons jiggle, apps get a
- * "−" badge, dragging starts as soon as the finger moves, taps open folders.
+ * "−" badge instead of their notification badge, dragging starts as soon as the finger moves, taps open folders.
  *
  * @param jiggleSeed varies the jiggle phase per icon (its position works well).
  * @param hidden keeps the slot but draws nothing (the icon is lifted by the menu).
@@ -126,9 +127,11 @@ fun HomeIcon(
         Box(contentAlignment = Alignment.Center) {
             MergeHalo(visible = mergeTarget && entry is AppEntry, size = slot.iconSize)
             val iconModifier = Modifier.onGloballyPositioned { bounds = it.boundsInWindow() }
+            // Edit mode hides badges, as on iOS: nothing sits next to the "−" button.
+            val badge = if (editMode) IconBadge.Hidden else IconBadge.Shown
             when (entry) {
-                is AppEntry -> AppIconImage(entry.app, iconModifier, size = slot.iconSize, dimmed = pressed)
-                is FolderEntry -> FolderIcon(entry, iconModifier, size = slot.iconSize, highlighted = mergeTarget)
+                is AppEntry -> AppIconImage(entry.app, iconModifier, size = slot.iconSize, dimmed = pressed, badge = badge)
+                is FolderEntry -> FolderIcon(entry, iconModifier, size = slot.iconSize, highlighted = mergeTarget, badge = badge)
                 is PlaceholderEntry, is PageWidgetEntry -> Unit
             }
             if (editMode && entry is AppEntry) {

@@ -94,6 +94,23 @@ object Tokens {
     val IconDarkTop = Color(0xFF323235)
     val IconDarkBottom = Color(0xFF0F0F11)
 
+    /**
+     * Notification badge over an app icon's top-end corner, measured in shares of the icon size so
+     * it follows every area's icon size (iOS: about 22 pt on a 60 pt icon, 6 pt past the corner).
+     */
+    const val BadgeSizeRatio = 0.36f
+    const val BadgeDotRatio = 0.2f
+    const val BadgeOverhangRatio = 0.08f
+    /** Number height relative to the badge, and the side padding of a two- or three-character pill. */
+    const val BadgeTextRatio = 0.64f
+    const val BadgePaddingRatio = 0.3f
+    /** Hairline that keeps the badge apart from a red icon. */
+    const val BadgeStrokeRatio = 0.012f
+    /** iOS system red. */
+    val BadgeColor = Color(0xFFFF3B30)
+    val BadgeStroke = Color.Black.copy(alpha = 0.15f)
+    val BadgeText = Color.White
+
     val Destructive = Color(0xFFFF453A)
     /** Default accent (iOS system blue); Dynamic Color replaces it, see [AccentColors]. */
     val Accent = Color(0xFF0A84FF)

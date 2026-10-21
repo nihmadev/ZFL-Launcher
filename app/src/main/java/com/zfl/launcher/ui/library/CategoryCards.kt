@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.zfl.launcher.ui.icon.badgeOverhang
 import com.zfl.launcher.data.AppGroup
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.data.AppLibraryState
@@ -139,13 +140,14 @@ fun CategoryOverlay(group: AppGroup?, callbacks: LibraryCallbacks, onClose: () -
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 56.dp, bottom = 28.dp),
+                    // The grid below starts with room for the first row's badges; the icons stay where they were.
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 56.dp, bottom = 28.dp - badgeOverhang(Tokens.IconSize)),
                 )
                 if (drag?.isDragging == true && shown.kind !in listOf(GroupKind.Suggestions, GroupKind.Recent)) {
                     LibraryPlacementGrid(shown.apps, null, callbacks, rememberLazyGridState(), drag, groupId = shown.id)
                 } else LazyVerticalGrid(
                     columns = GridCells.Fixed(Tokens.LibraryColumns),
-                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = badgeOverhang(Tokens.IconSize)),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(shown.apps, key = { it.key }) { app -> LibraryCell(app, callbacks) }

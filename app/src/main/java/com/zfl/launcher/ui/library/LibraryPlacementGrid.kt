@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
+import com.zfl.launcher.ui.icon.badgeOverhang
 import com.zfl.launcher.data.AppEntry
 import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.data.DropPosition
@@ -85,7 +86,7 @@ internal fun LibraryPlacementGrid(
         state = state,
         modifier = modifier.fillMaxSize().then(bounds.modifier).onGloballyPositioned { drag?.refreshTarget() },
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp,
-            top = if (header == null) 0.dp else 12.dp, bottom = if (groupId == null) 24.dp else 0.dp),
+            top = if (header == null) badgeOverhang(Tokens.IconSize) else 12.dp, bottom = if (groupId == null) 24.dp else 0.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
         userScrollEnabled = picked == null,
     ) {

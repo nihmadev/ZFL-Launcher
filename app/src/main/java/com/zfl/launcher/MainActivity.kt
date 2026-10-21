@@ -32,6 +32,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Rect
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -45,7 +46,9 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.activity.compose.setContent
 import com.zfl.launcher.data.AppInfo
+import com.zfl.launcher.island.NotificationBadgeFeed
 import com.zfl.launcher.settings.AppLanguage
+import com.zfl.launcher.settings.BadgeStyle
 import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.ui.glass.GlassLight
 import com.zfl.launcher.ui.glass.GlassMode
@@ -58,7 +61,9 @@ import com.zfl.launcher.ui.glass.resolveGlassMode
 import com.zfl.launcher.ui.glass.LocalGlassStyle
 import com.zfl.launcher.ui.home.HomeScreen
 import com.zfl.launcher.ui.home.LauncherActions
+import com.zfl.launcher.ui.icon.BadgeSource
 import com.zfl.launcher.ui.icon.IconLoader
+import com.zfl.launcher.ui.icon.LocalBadges
 import com.zfl.launcher.ui.icon.LocalIconLoader
 import com.zfl.launcher.ui.theme.AccentColors
 import com.zfl.launcher.ui.theme.LocalAccent
@@ -123,6 +128,11 @@ class MainActivity : ComponentActivity(), LauncherActions {
             val glass by vm.glass.collectAsStateWithLifecycle()
             val settings by vm.settings.state.collectAsStateWithLifecycle()
             val editMode by vm.editMode.collectAsStateWithLifecycle()
+            // Not read here: each icon reads its own count from it (see BadgeSource).
+            val badgeCounts = NotificationBadgeFeed.counts.collectAsStateWithLifecycle()
+            val badges = remember(badgeCounts, settings.badges) {
+                settings.badges.takeIf { it != BadgeStyle.Off }?.let { BadgeSource(badgeCounts, it) }
+            }
             LaunchedEffect(settings.hideNavigation) { applyNavigationBarVisibility(settings.hideNavigation) }
             // Like iOS27L, the status bar makes room for the Edit/Done bar in edit mode.
             LaunchedEffect(editMode) { applyStatusBarVisibility(hidden = editMode) }
@@ -130,6 +140,7 @@ class MainActivity : ComponentActivity(), LauncherActions {
                 LocalSettingsState provides settings,
                 LocalGlassSource provides glass.takeIf { settings.blurEffect },
                 LocalIconLoader provides iconLoader,
+                LocalBadges provides badges,
                 LocalGlassStyle provides settings.glassStyle(),
                 LocalGlassLight provides glassLight,
                 LocalAccent provides AccentColors.resolve(settings.dynamicColor, iconLoader.wallpaperColor),

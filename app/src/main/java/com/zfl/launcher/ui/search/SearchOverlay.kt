@@ -66,6 +66,7 @@ import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
+import com.zfl.launcher.ui.icon.IconBadge
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
@@ -332,6 +333,7 @@ private fun TappableIcon(app: AppInfo, size: androidx.compose.ui.unit.Dp, callba
     AppIconImage(
         app = app,
         size = size,
+        badge = IconBadge.Shown,
         modifier = Modifier
             .onGloballyPositioned { bounds = it.boundsInWindow() }
             .pointerInput(app.key) {

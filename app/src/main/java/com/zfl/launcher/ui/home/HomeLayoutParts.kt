@@ -66,6 +66,8 @@ import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.FolderGlass
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
+import com.zfl.launcher.ui.icon.IconBadge
+import com.zfl.launcher.ui.icon.groupBadgeModifier
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.shape.IconShape
 import com.zfl.launcher.ui.theme.Tokens
@@ -245,6 +247,7 @@ fun RemoveBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
 /**
  * Folder icon: a glass tile showing the first nine apps as tiny icons, like iOS.
  * [highlighted] grows it a little (an app is hovering over it, ready to be added).
+ * Its [badge] is the sum of its apps' notification counts.
  */
 @Composable
 fun FolderIcon(
@@ -252,15 +255,18 @@ fun FolderIcon(
     modifier: Modifier = Modifier,
     size: Dp,
     highlighted: Boolean = false,
+    badge: IconBadge = IconBadge.None,
 ) {
     val settings = LocalSettingsState.current
     val shape = IconShape(settings.iconCorner)
     val scale by animateFloatAsState(if (highlighted) 1.15f else 1f, Motion.bouncy(), label = "folderHover")
+    val badged = groupBadgeModifier(folder.apps, folder.name, badge)
     FolderGlass(settings.folders) {
         Box(
             modifier
                 .size(size)
                 .graphicsLayer { scaleX = scale; scaleY = scale }
+                .then(badged)
                 .glass(shape, tint = if (highlighted) Color.White.copy(alpha = 0.32f) else Color.Unspecified, profile = GlassProfile.Tile),
         ) {
             folder.apps.take(GridSpec.Folder.cellCount).forEachIndexed { index, app ->
