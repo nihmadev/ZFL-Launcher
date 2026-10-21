@@ -203,6 +203,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
      * New folders are named after the category of the app they were created on.
      */
     fun drop(id: String, position: DropPosition) {
+        if (position is DropPosition.Library) {
+            if (!canArrange || visibleApps.value.none { it.key == id } || !library.place(id, position)) return
+        }
         writer.arrange { current ->
             val item = findItem(current, id) ?: return@arrange current
             current.move(item, position, dockCapacity) {
@@ -215,6 +218,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private fun findItem(layout: LayoutData, id: String): HomeItem? =
         (layout.pages.flatten() + layout.dock).firstOrNull { it.id == id }
             ?: AppItem(id).takeIf { id in layout.allAppKeys() }
+            ?: visibleApps.value.firstOrNull { it.key == id }?.let { AppItem(it.key) }
 
     // endregion
 

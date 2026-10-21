@@ -9,6 +9,10 @@ import com.zfl.launcher.data.LibraryView
 import com.zfl.launcher.data.assign
 import com.zfl.launcher.data.libraryStates
 import com.zfl.launcher.data.pin
+import com.zfl.launcher.data.placeInGrid
+import com.zfl.launcher.data.placeInGroup
+import com.zfl.launcher.data.DropPosition
+import com.zfl.launcher.data.LibraryIds
 import com.zfl.launcher.data.unpin
 import com.zfl.launcher.settings.LauncherSettings
 import kotlinx.coroutines.CoroutineScope
@@ -76,6 +80,23 @@ class LibraryActions internal constructor(
     /** Switches between Categories, Grid and List (the button next to the search pill). */
     fun setView(view: LibraryView) {
         edit { it.copy(view = view) }
+    }
+
+    /** Commits the same neighbor that the grid's insertion marker previewed. */
+    fun place(appKey: String, position: DropPosition.Library): Boolean {
+        val library = state.value ?: return false
+        if (library.alphabetical.none { it.key == appKey }) return false
+        val group = position.groupId?.let { id -> library.cards.firstOrNull { it.id == id } ?: return false }
+        if (group != null && group.id != LibraryIds.PINNED && library.summary(group.id) == null) return false
+        val shown = (group?.apps ?: library.gridApps).map { it.key }
+        val beforeKey = position.beforeKey
+        if (beforeKey == appKey || (beforeKey != null && beforeKey !in shown)) return false
+        edit {
+            if (group == null) it.placeInGrid(appKey, beforeKey, shown)
+            else it.placeInGroup(appKey, group.id, beforeKey, shown)
+                .copy(groupOrder = library.allGroups.map { summary -> summary.id })
+        }
+        return true
     }
 
     private fun edit(transform: (LibraryConfig) -> LibraryConfig) {

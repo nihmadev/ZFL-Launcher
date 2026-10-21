@@ -67,6 +67,8 @@ data class LayoutData(
 
 /** Where an item can be dropped. */
 sealed interface DropPosition {
+    /** Leave an installed app in the App Library only. */
+    data class Library(val beforeKey: String? = null, val groupId: String? = null) : DropPosition
     /** Insert at [index] of home screen [page] (a page equal to the page count creates a new page). */
     data class Page(val page: Int, val index: Int) : DropPosition
     /** Place at an exact top-left grid cell, preserving empty space. */
@@ -207,7 +209,7 @@ fun LayoutData.removeFromHome(appKey: String, dockCapacity: Int = DEFAULT_DOCK_C
     without(appKey).copy(removed = removed + appKey).normalized(dockCapacity)
 
 /**
- * Moves [item] (an app or folder that may currently be anywhere) to [position].
+ * Moves [item] to [position], including apps picked up from the App Library.
  * Returns the unchanged layout when the drop is not allowed (e.g. full dock).
  */
 fun LayoutData.move(
@@ -216,12 +218,16 @@ fun LayoutData.move(
     dockCapacity: Int = DEFAULT_DOCK_CAPACITY,
     folderName: () -> String,
 ): LayoutData {
+    if (position is DropPosition.Library) {
+        return if (item is AppItem && item.appKey in allAppKeys()) removeFromHome(item.appKey, dockCapacity) else this
+    }
     val result = moveUnchecked(item, position, dockCapacity, folderName)
         // An app placed on the Home Screen is no longer "removed".
         .let { it.copy(removed = it.removed - it.allAppKeys()) }
     // Safety net: a drop must never lose an app (e.g. merging onto a folder that dissolved
     // when the item left it). If anything went missing, keep the old layout.
-    return if (result.allAppKeys() == allAppKeys()) result else this
+    val expectedApps = allAppKeys().let { if (item is AppItem) it + item.appKey else it }
+    return if (result.allAppKeys() == expectedApps) result else this
 }
 
 private fun LayoutData.moveUnchecked(
@@ -266,7 +272,7 @@ private fun LayoutData.moveUnchecked(
             rest.copy(dock = dock).normalized(dockCapacity)
         }
 
-        is DropPosition.InFolder, is DropPosition.PageCell -> this // handled above
+        is DropPosition.InFolder, is DropPosition.PageCell, is DropPosition.Library -> this // handled above
 
         is DropPosition.Merge -> {
             // Folders can't be nested: dropping a folder onto something just reorders nothing.
