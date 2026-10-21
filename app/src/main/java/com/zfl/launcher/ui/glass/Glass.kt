@@ -35,6 +35,8 @@ data class GlassStyle(
     val edge: Boolean = true,
     val mode: GlassMode = GlassMode.Frosted,
     val refraction: Float = SettingsState.DEFAULT_GLASS_REFRACTION,
+    /** Explicit readable body when there is no sampled backdrop (e.g. a window over other apps). */
+    val fallback: Color = Tokens.GlassFallback,
 )
 
 val LocalGlassStyle = compositionLocalOf { GlassStyle() }
@@ -118,9 +120,9 @@ internal class FrostedGlass {
     private var strokeColor: Color = Color.Unspecified
 
     /** Fills [path] with the wallpaper under [windowPos] tinted by [color], or a flat tint without [source]. */
-    fun DrawScope.drawBody(path: Path, source: GlassSource?, color: Color, windowPos: Offset) {
+    fun DrawScope.drawBody(path: Path, source: GlassSource?, color: Color, windowPos: Offset, fallback: Color) {
         if (source == null) {
-            drawPath(path, Tokens.GlassFallback)
+            drawPath(path, fallback)
             return
         }
         if (color != filterColor || tintFilter == null) {

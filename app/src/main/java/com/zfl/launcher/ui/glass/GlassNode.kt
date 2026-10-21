@@ -137,7 +137,7 @@ internal class GlassNode(
         // Frosted, or the flat tint without a wallpaper.
         val color = if (tint.isSpecified) tint else Color.White.copy(alpha = style.tintAlpha)
         with(frosted) {
-            drawBody(path, source, color, windowPos)
+            drawBody(path, source, color, windowPos, style.fallback)
             if (style.edge) drawEdge(path, stroke)
         }
         drawContent()
