@@ -22,6 +22,15 @@ enum class MenuAction {
     LibraryCategory,
 }
 
+/** Notification counts on app icons: off, the number in a red circle, or just a red dot. */
+enum class BadgeStyle {
+    Off, Number, Dot;
+
+    companion object {
+        fun fromStored(name: String?): BadgeStyle = entries.firstOrNull { it.name == name } ?: Off
+    }
+}
+
 /** Every user-configurable option of the launcher. Defaults match a fresh install. */
 data class SettingsState(
     /** Hide the system navigation bar on the home screen (swipe from the edge to show it). */
@@ -83,6 +92,8 @@ data class SettingsState(
     val tintCustomIcons: Boolean = true,
     /** The glass edge highlight (as on the dock and menus) along every app icon, in every appearance. */
     val iconEdge: Boolean = true,
+    /** Off until the user picks a style; counts need notification access, checked at runtime. */
+    val badges: BadgeStyle = BadgeStyle.Off,
 
     val showDock: Boolean = true,
     /** Favorite apps the dock holds, one of [DOCK_CAPACITY_OPTIONS]. */

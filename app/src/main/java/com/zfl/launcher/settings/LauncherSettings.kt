@@ -83,6 +83,7 @@ class LauncherSettings private constructor(context: Context) {
             putFloat(KEY_ICON_TINT_SATURATION, next.iconTintSaturation)
             putBoolean(KEY_TINT_CUSTOM_ICONS, next.tintCustomIcons)
             putBoolean(KEY_ICON_EDGE, next.iconEdge)
+            putString(KEY_BADGES, next.badges.name)
             putBoolean(KEY_SHOW_DOCK, next.showDock)
             putInt(KEY_DOCK_SLOTS, next.dockSlots)
             putBoolean(KEY_DOCK_BACKGROUND, next.dockBackground)
@@ -209,6 +210,7 @@ class LauncherSettings private constructor(context: Context) {
         iconTintSaturation = prefs.getFloat(KEY_ICON_TINT_SATURATION, Defaults.iconTintSaturation),
         tintCustomIcons = prefs.getBoolean(KEY_TINT_CUSTOM_ICONS, Defaults.tintCustomIcons),
         iconEdge = prefs.getBoolean(KEY_ICON_EDGE, Defaults.iconEdge),
+        badges = BadgeStyle.fromStored(prefs.getString(KEY_BADGES, null)),
         showDock = prefs.getBoolean(KEY_SHOW_DOCK, Defaults.showDock),
         dockSlots = prefs.getInt(KEY_DOCK_SLOTS, Defaults.dockSlots),
         dockBackground = prefs.getBoolean(KEY_DOCK_BACKGROUND, Defaults.dockBackground),
@@ -288,6 +290,7 @@ class LauncherSettings private constructor(context: Context) {
         private const val KEY_ICON_TINT_SATURATION = "icon_tint_saturation"
         private const val KEY_TINT_CUSTOM_ICONS = "tint_custom_icons"
         private const val KEY_ICON_EDGE = "icon_edge"
+        private const val KEY_BADGES = "notification_badges"
         private const val KEY_SHOW_DOCK = "show_dock"
         private const val KEY_DOCK_SLOTS = "dock_slots"
         private const val KEY_DOCK_BACKGROUND = "dock_background"
