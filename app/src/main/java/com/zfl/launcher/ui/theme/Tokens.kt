@@ -22,7 +22,39 @@ object Tokens {
     val MinIconSize = 24.dp
     /** Columns of an App Library category, independent of the Home Screen grid. */
     const val LibraryColumns = 4
+    val LibraryDragScrollEdge = 56.dp
+    val LibraryDragScrollSpeed = 640.dp
+    const val LibraryGroupHoverMillis = 550L
     val LabelSize = 13.sp
+
+    /** Folder preview and expanded surface share the same three-column arrangement. */
+    const val FolderPreviewPadding = 0.13f
+    const val FolderPreviewGap = 0.05f
+    val FolderPanelWidth = 340.dp
+    val FolderPanelHeight = 356.dp
+    val FolderPanelRadius = 40.dp
+    val FolderPanelMinWidth = 280.dp
+    val FolderPanelMaxWidth = 400.dp
+    val FolderPanelMinHeight = 280.dp
+    val FolderPanelMaxHeight = 460.dp
+    val FolderPanelMaxRadius = 64.dp
+    const val FolderMinTitleScale = 0.75f
+    const val FolderMaxTitleScale = 1.25f
+    const val FolderMaxScrimAlpha = 0.6f
+    val FolderSettingsPreviewHeight = 280.dp
+    const val FolderSettingsPreviewScale = 0.6f
+    val FolderScreenMargin = 24.dp
+    val FolderGridTop = 20.dp
+    val FolderTitleSize = 32.sp
+    val FolderTitleGap = 24.dp
+    val FolderTitleFieldRadius = 14.dp
+    val FolderTitleFieldPadding = 4.dp
+    val FolderPageHeight = 28.dp
+    val FolderPageDotSize = 6.dp
+    val FolderPageDotGap = 8.dp
+    const val FolderPageInactiveAlpha = 0.3f
+    const val FolderScrimAlpha = 0.18f
+    const val FolderDetailRevealStart = 0.35f
 
     val DockHeight = 108.dp
     val DockRadius = 38.dp
@@ -36,6 +68,7 @@ object Tokens {
 
     val PillHeight = 26.dp
     val SearchSwipeThreshold = 56.dp
+    val DragPageSwipeThreshold = 48.dp
 
     val GlassTint = Color.White.copy(alpha = 0.12f)
     val GlassFallback = Color(0xB32D2D2A)
@@ -52,6 +85,10 @@ object Tokens {
     val MenuRadius = 24.dp
     val MenuVerticalPadding = 6.dp
     val WidgetBackground = Color(0xFF1C1C1D)
+    /** Corner radius of a widget card on the home screen. */
+    val WidgetRadius = 22.dp
+    /** Shadow under an icon or widget lifted by a drag. */
+    val DragShadow = 16.dp
 
     /** Vertical gradient behind Dark and Tinted app icons (iOS 18 dark icon backdrop). */
     val IconDarkTop = Color(0xFF323235)

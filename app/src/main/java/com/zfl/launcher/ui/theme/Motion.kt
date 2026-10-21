@@ -38,8 +38,17 @@ object Motion {
     const val QUICK_FADE_MS: Int = 150
     /** Fade-in of the drop marker under a dragged item. */
     const val MARKER_FADE_MS: Int = 180
+    /** How much an item grows when a drag lifts it off the grid, like iOS. */
+    const val LIFT_SCALE: Float = 1.15f
     /** Push/pop between settings screens. */
     const val PUSH_MS: Int = 420
+    /** Island shape: a soft spring with a little overshoot, like the Dynamic Island. */
+    const val ISLAND_DAMPING: Float = 0.72f
+    const val ISLAND_STIFFNESS: Float = 260f
+    /** Island content: the old one fades out first, the new one unblurs while the shape grows. */
+    const val ISLAND_OUT_MS: Int = 120
+    const val ISLAND_IN_MS: Int = 280
+    const val ISLAND_IN_DELAY_MS: Int = 80
 
     /** UIKit's default navigation curve: a fast start and a long, soft landing. */
     val IosEasing: Easing = CubicBezierEasing(0.2f, 0.9f, 0.25f, 1f)
@@ -47,7 +56,7 @@ object Motion {
     /** A surface growing out of its source and back: folders, App Library categories, returning home. */
     fun <T> expand(): SpringSpec<T> = spring(EXPAND_DAMPING, EXPAND_STIFFNESS)
 
-    /** The long-press menu: quicker than [expand], with a hint of overshoot. */
+    /** The long-press menu and a dragged item lifting off: quicker than [expand], with a hint of overshoot. */
     fun <T> pop(): SpringSpec<T> = spring(POP_DAMPING, POP_STIFFNESS)
 
     /** Bottom sheets sliding in and out: the widget gallery, the stack editor. */
