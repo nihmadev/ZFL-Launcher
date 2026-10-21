@@ -5,14 +5,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.semantics.Role
@@ -54,11 +57,17 @@ fun AppIconImage(
     // Changes with a custom icon, an app update, the size, shape or appearance, which
     // triggers a reload. Reading it subscribes this scope only, not its parents.
     val cacheKey = loader.cacheKey(app, sizePx)
-    val bitmap = remember(app.key) { mutableStateOf(loader.cached(app, sizePx)) }
-    LaunchedEffect(cacheKey) {
-        if (cacheKey == null) return@LaunchedEffect
-        // The previous bitmap stays visible until the new one is ready: no blink on a restyle.
-        bitmap.value = loader.cached(app, sizePx) ?: loader.load(app, sizePx) ?: return@LaunchedEffect
+    val slot = remember(app.key) {
+        val cached = loader.cached(app, sizePx)
+        IconSlot(if (cached != null) cacheKey else null, cached)
+    }
+    // An icon already in the cache starts no effect: rows scrolling in stay cheap to compose.
+    if (cacheKey != null && cacheKey != slot.key) {
+        LaunchedEffect(cacheKey) {
+            // The previous bitmap stays visible until the new one is ready: no blink on a restyle.
+            slot.bitmap = loader.cached(app, sizePx) ?: loader.load(app, sizePx) ?: return@LaunchedEffect
+            slot.key = cacheKey
+        }
     }
     val label = app.label
     Spacer(
@@ -70,7 +79,7 @@ fun AppIconImage(
             }
             // The bitmap is read in the draw phase: loading it only redraws, never recomposes.
             .drawBehind {
-                val image = bitmap.value ?: return@drawBehind
+                val image = slot.bitmap ?: return@drawBehind
                 drawImage(
                     image = image,
                     dstSize = IntSize(this.size.width.roundToInt(), this.size.height.roundToInt()),
@@ -79,6 +88,11 @@ fun AppIconImage(
                 )
             },
     )
+}
+
+/** Bitmap shown by [AppIconImage] and the cache key it was loaded for; the bitmap is snapshot state. */
+private class IconSlot(var key: String?, bitmap: ImageBitmap?) {
+    var bitmap: ImageBitmap? by mutableStateOf(bitmap)
 }
 
 private val PressedDim = ColorFilter.tint(Color.Black.copy(alpha = 0.3f), BlendMode.SrcAtop)
