@@ -2,18 +2,21 @@ package com.zfl.launcher.ui.home
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -23,8 +26,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,36 +44,28 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
-import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.OpenFolder
-import com.zfl.launcher.data.GridSpec
-import com.zfl.launcher.data.Span
-import com.zfl.launcher.settings.GridMargins
-import com.zfl.launcher.settings.IconArea
-import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.data.FolderEntry
+import com.zfl.launcher.settings.LocalSettingsState
+import com.zfl.launcher.ui.glass.FolderGlass
+import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
-import com.zfl.launcher.ui.theme.Tokens
+import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.ui.theme.Motion
+import com.zfl.launcher.ui.theme.Tokens
 
-private val PanelWidth = 340.dp
-private val PanelHeight = 356.dp
-// Two full cells plus the last row's icon and label leave ~20dp of slack; split it evenly.
-private val FolderGridMargins = GridMargins(side = Tokens.GridSidePadding, top = 20.dp, bottom = 0.dp)
-private val PanelShape = ContinuousRoundedShape(40.dp)
-
-/**
- * An open folder: a translucent panel that grows out of the folder icon, with the folder
- * name above it. Apps are shown nine per page. In edit mode the name is editable and apps
- * can be reordered; dragging one out of the panel closes the folder (see [DragController]).
- */
+/** An interruptible expansion from the folder tile into a glass panel, nine apps per page. */
 @Composable
 fun FolderOverlay(
     open: OpenFolder?,
@@ -79,101 +76,124 @@ fun FolderOverlay(
     onClose: () -> Unit,
     onRename: (id: String, name: String) -> Unit,
 ) {
-    // Keep drawing the last folder while the close animation runs.
+    val appearance = LocalSettingsState.current.folders
+    val panelShape = remember(appearance.radius) { ContinuousRoundedShape(appearance.radius.dp) }
     var last by remember { mutableStateOf<Pair<OpenFolder, FolderEntry>?>(null) }
-    if (open != null && folder != null) last = open to folder
-    // Read only in draw/layer lambdas: the animation itself never recomposes the folder.
+    val current = if (open != null && folder != null) open to folder else null
+    SideEffect { if (current != null) last = current }
     val progress = animateFloatAsState(
-        targetValue = if (open != null && folder != null) 1f else 0f,
+        targetValue = if (current != null) 1f else 0f,
         animationSpec = Motion.expand(),
         label = "folder",
     )
-    val settled by remember { derivedStateOf { progress.value < 0.01f } }
-    // The folder disappeared (e.g. its last apps were dragged out): close it.
+    val hidden by remember { derivedStateOf { progress.value == 0f } }
     LaunchedEffect(open, folder) { if (open != null && folder == null) onClose() }
-
-    val (shown, entry) = last ?: return
-    if (settled && open == null) {
-        SideEffect { drag.folderPanel = null; drag.folderGrid = null; drag.openFolder = null }
+    val retained = current ?: last
+    if (retained == null || (hidden && current == null)) {
+        SideEffect {
+            last = null
+            drag.folderPanel = null
+            drag.folderGrid = null
+            drag.openFolder = null
+        }
         return
     }
-    val isOpen = open != null
-    SideEffect { drag.openFolder = if (isOpen) entry else null }
-
-    var name by remember(entry.id) { mutableStateOf(entry.name) }
-    val focusManager = LocalFocusManager.current
-    val commitAndClose = {
-        focusManager.clearFocus()
-        onRename(entry.id, name)
-        onClose()
+    val (shown, entry) = retained
+    val isOpen = current != null
+    SideEffect {
+        drag.openFolder = if (isOpen) entry else null
+        if (!isOpen) {
+            drag.folderPanel = null
+            drag.folderGrid = null
+        }
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .drawBehind { drawRect(Color.Black, alpha = 0.25f * progress.value) }
-            .then(if (isOpen) Modifier.pointerInput(Unit) { detectTapGestures { commitAndClose() } } else Modifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        var panelBounds by remember { mutableStateOf(Rect.Zero) }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            FolderTitle(
-                name = name,
-                editable = editMode && isOpen,
-                focusOnStart = shown.renaming,
-                onNameChange = { name = it },
-                onDone = { focusManager.clearFocus(); onRename(entry.id, name) },
-                modifier = Modifier.graphicsLayer { alpha = progress.value },
-            )
-            Spacer(Modifier.height(24.dp))
-            Box(
+    key(entry.id) {
+        var name by remember(entry.name) { mutableStateOf(entry.name) }
+        val focusManager = LocalFocusManager.current
+        val commitName = {
+            if (name.trim().isNotEmpty() && name.trim() != entry.name) onRename(entry.id, name)
+        }
+        val commitAndClose by rememberUpdatedState {
+            focusManager.clearFocus()
+            commitName()
+            onClose()
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    drawRect(Color.Black, alpha = appearance.dim * progress.value.coerceIn(0f, 1f))
+                }
+                .then(if (isOpen) Modifier.pointerInput(Unit) {
+                    detectTapGestures { commitAndClose() }
+                } else Modifier.clearAndSetSemantics { }),
+        ) {
+            BoxWithConstraints(
                 Modifier
-                    .size(PanelWidth, PanelHeight)
-                    .onGloballyPositioned {
-                        panelBounds = it.boundsInWindow()
-                        if (isOpen) drag.folderPanel = panelBounds
-                    }
-                    .graphicsLayer {
-                        // Grow out of the folder icon.
-                        val icon = shown.iconBounds
-                        val startScale = if (panelBounds.width > 0) icon.width / panelBounds.width else 0.2f
-                        val p = progress.value
-                        val scale = lerp(startScale, 1f, p)
-                        scaleX = scale
-                        scaleY = scale
-                        translationX = lerp(icon.center.x - panelBounds.center.x, 0f, p)
-                        translationY = lerp(icon.center.y - panelBounds.center.y, 0f, p)
-                    }
-                    .background(Color.White.copy(alpha = 0.16f), PanelShape)
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), PanelShape)
-                    // Taps inside the panel must not close the folder.
-                    .pointerInput(Unit) { detectTapGestures { } },
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .imePadding()
+                    .padding(Tokens.FolderScreenMargin),
+                contentAlignment = Alignment.Center,
             ) {
-                // Rebuilt only when the folder or the drag target changes, so icons don't recompose.
-                val apps = remember(entry, drag.target, drag.draggedId) { drag.previewFolder(entry) }
-                val pages = apps.chunked(FOLDER_PAGE_SIZE).ifEmpty { listOf(emptyList()) }
-                val pager = rememberPagerState { pages.size }
-                SideEffect { drag.folderPage = pager.currentPage }
-                // The folder's own grid and icon size, whatever the Home Screen grid is.
-                val metrics = rememberAreaMetrics(LocalSettingsState.current, IconArea.Folder)
-                HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { page ->
-                    IconGrid(
-                        entries = pages.getOrElse(page) { emptyList() },
-                        grid = GridSpec.Folder,
-                        metrics = metrics,
-                        margins = FolderGridMargins,
-                        onGeometry = if (page == pager.currentPage && isOpen) ({ drag.folderGrid = it }) else null,
-                        marker = drag.folderMarker(entry)
-                            ?.takeIf { it / FOLDER_PAGE_SIZE == page }
-                            ?.let { it % FOLDER_PAGE_SIZE to Span.One },
-                    ) { app, slot ->
-                        HomeIcon(
-                            entry = app,
-                            slot = slot,
-                            editMode = editMode,
-                            jiggleSeed = apps.indexOf(app),
-                            callbacks = iconCallbacks,
+                var panelBounds by remember { mutableStateOf(Rect.Zero) }
+                SideEffect {
+                    if (isOpen && panelBounds.width > 0f && panelBounds.height > 0f) drag.folderPanel = panelBounds
+                }
+                Column(
+                    Modifier.width(min(appearance.width.dp, maxWidth)).heightIn(max = maxHeight),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    if (appearance.showTitle || editMode) {
+                        FolderTitle(
+                            name = name,
+                            editable = editMode && isOpen,
+                            focusOnStart = shown.renaming,
+                            onNameChange = { name = it },
+                            onDone = { focusManager.clearFocus(); commitName() },
+                            scale = appearance.titleScale,
+                            modifier = Modifier.graphicsLayer {
+                                val p = progress.value.coerceIn(0f, 1f)
+                                alpha = folderDetailAlpha(p)
+                                translationY = Tokens.FolderTitleGap.toPx() * (1f - p)
+                            },
                         )
+                        Spacer(Modifier.height(Tokens.FolderTitleGap))
+                    }
+                    // Measure outside the animated layer: its destination and drag bounds
+                    // stay fixed while the inner surface grows out of the source tile.
+                    Box(
+                        Modifier
+                            .weight(1f, fill = false)
+                            .fillMaxWidth()
+                            .height(appearance.height.dp)
+                            .onGloballyPositioned {
+                                panelBounds = it.boundsInWindow()
+                            },
+                    ) {
+                        FolderGlass(appearance) {
+                            Box(
+                                Modifier
+                                    .matchParentSize()
+                                    .graphicsLayer {
+                                        val p = progress.value.coerceIn(0f, 1f)
+                                        val icon = shown.iconBounds
+                                        scaleX = lerp(icon.width / panelBounds.width.coerceAtLeast(1f), 1f, p)
+                                        scaleY = lerp(icon.height / panelBounds.height.coerceAtLeast(1f), 1f, p)
+                                        translationX = (icon.center.x - panelBounds.center.x) * (1f - p)
+                                        translationY = (icon.center.y - panelBounds.center.y) * (1f - p)
+                                        alpha = p
+                                        shape = panelShape
+                                        clip = true
+                                    }
+                                    .glass(panelShape)
+                                    .semantics { paneTitle = entry.name }
+                                    .pointerInput(Unit) { detectTapGestures { } },
+                            ) {
+                                FolderContents(entry, isOpen, editMode, panelBounds, progress, drag, iconCallbacks)
+                            }
+                        }
                     }
                 }
             }
@@ -188,11 +208,12 @@ private fun FolderTitle(
     focusOnStart: Boolean,
     onNameChange: (String) -> Unit,
     onDone: () -> Unit,
+    scale: Float,
     modifier: Modifier = Modifier,
 ) {
-    val style = TextStyle(color = Tokens.TextPrimary, fontSize = 34.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+    val style = folderTitleStyle(scale)
     if (!editable) {
-        Text(name, style = style, maxLines = 1, modifier = modifier.padding(horizontal = 24.dp))
+        Text(name, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = modifier)
         return
     }
     val focus = remember { FocusRequester() }
@@ -207,9 +228,15 @@ private fun FolderTitle(
         keyboardActions = KeyboardActions(onDone = { onDone() }),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 40.dp)
             .focusRequester(focus)
-            .background(Color.White.copy(alpha = 0.12f), ContinuousRoundedShape(14.dp))
-            .padding(vertical = 4.dp),
+            .background(Tokens.GlassTint, ContinuousRoundedShape(Tokens.FolderTitleFieldRadius))
+            .padding(vertical = Tokens.FolderTitleFieldPadding),
     )
 }
+
+internal fun folderTitleStyle(scale: Float): TextStyle = TextStyle(
+    color = Tokens.TextPrimary,
+    fontSize = Tokens.FolderTitleSize * scale,
+    fontWeight = FontWeight.Normal,
+    textAlign = TextAlign.Center,
+)
