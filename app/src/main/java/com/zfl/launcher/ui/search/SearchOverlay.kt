@@ -322,7 +322,8 @@ private fun ResultRow(app: AppInfo, callbacks: SearchCallbacks) {
 /** Search rows are the App Library's list rows. */
 private fun SearchCallbacks.asLibraryCallbacks(): LibraryCallbacks = object : LibraryCallbacks {
     override fun onLaunch(app: AppInfo, bounds: Rect) = this@asLibraryCallbacks.onLaunch(app, bounds)
-    override fun onLongPress(app: AppInfo, bounds: Rect) = this@asLibraryCallbacks.onLongPress(app, bounds)
+    override fun onLongPress(app: AppInfo, bounds: Rect, pointer: androidx.compose.ui.geometry.Offset) =
+        this@asLibraryCallbacks.onLongPress(app, bounds)
 }
 
 @Composable
