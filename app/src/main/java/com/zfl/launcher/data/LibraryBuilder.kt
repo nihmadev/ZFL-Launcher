@@ -55,6 +55,9 @@ data class LibraryState<T>(
     val allGroups: List<GroupSummary> = emptyList(),
     /** Every visible app by name. */
     val alphabetical: List<T> = emptyList(),
+    /** Full grid in saved order, with newly visible apps appended by name. */
+    val gridApps: List<T> = emptyList(),
+    val manualGrid: Boolean = false,
     val sections: List<LetterSection<T>> = emptyList(),
     /** App key → id of its regular group. */
     val groupOf: Map<String, String> = emptyMap(),
@@ -121,7 +124,8 @@ fun <T : LibraryApp> buildLibrary(
     val recent = if (!config.showRecent) emptyList() else
         apps.filter { it.installTime > 0 }.sortedWith(compareByDescending<T> { it.installTime }.thenBy { it.key }).take(SMART_GROUP_SIZE)
     val groups = allGroups.filter { it.size > 0 }.map { group ->
-        LibraryGroup(group.id, group.title, group.kind, members.getValue(group.id).sortedWith(byUsage))
+        LibraryGroup(group.id, group.title, group.kind,
+            orderedLibraryGrid(members.getValue(group.id).sortedWith(byUsage), config.groupAppOrder[group.id].orEmpty()))
     }
     val cards = listOfNotNull(
         LibraryGroup(LibraryIds.PINNED, titles.pinned, GroupKind.Pinned, pinned).takeIf { pinned.isNotEmpty() },
@@ -136,6 +140,8 @@ fun <T : LibraryApp> buildLibrary(
         groups = groups,
         allGroups = allGroups,
         alphabetical = alphabetical,
+        gridApps = orderedLibraryGrid(alphabetical, config.gridOrder),
+        manualGrid = config.gridOrder.isNotEmpty(),
         sections = letterSections(alphabetical) { it.label },
         groupOf = groupIds,
         autoGroupOf = apps.filter { it.key in config.assignments }

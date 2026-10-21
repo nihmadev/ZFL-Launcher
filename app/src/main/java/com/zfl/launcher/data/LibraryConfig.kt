@@ -34,6 +34,10 @@ data class LibraryConfig(
     val pinned: List<String> = emptyList(),
     /** Regular group ids in the order the user arranged them; empty means automatic order. */
     val groupOrder: List<String> = emptyList(),
+    /** Manual order of the full grid; an empty list keeps the original automatic view. */
+    val gridOrder: List<String> = emptyList(),
+    /** Manual app order inside regular categories. */
+    val groupAppOrder: Map<String, List<String>> = emptyMap(),
 ) {
     fun category(id: String): UserCategory? = categories.firstOrNull { it.id == id }
 }
@@ -121,6 +125,7 @@ fun LibraryConfig.deleteCategory(id: String): LibraryConfig = copy(
     categories = categories.filter { it.id != id },
     assignments = assignments.filterValues { it != id },
     groupOrder = groupOrder - id,
+    groupAppOrder = groupAppOrder - id,
 )
 
 /**
@@ -181,8 +186,10 @@ fun LibraryConfig.withOrphansCapped(present: Set<String>, keepUsers: Set<String>
     }
     val nextAssignments = assignments.entries.toList().capped { it.key }.associate { it.key to it.value }
     val nextPinned = pinned.capped { it }
-    return if (nextAssignments.size == assignments.size && nextPinned.size == pinned.size) this
-    else copy(assignments = nextAssignments, pinned = nextPinned)
+    val nextGrid = gridOrder.capped { it }
+    val nextGroups = groupAppOrder.mapValues { (_, apps) -> apps.capped { it } }
+    return if (nextAssignments.size == assignments.size && nextPinned.size == pinned.size && nextGrid.size == gridOrder.size && nextGroups == groupAppOrder) this
+    else copy(assignments = nextAssignments, pinned = nextPinned, gridOrder = nextGrid, groupAppOrder = nextGroups)
 }
 
 // endregion

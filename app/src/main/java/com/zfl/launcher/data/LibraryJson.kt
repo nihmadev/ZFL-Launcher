@@ -18,6 +18,8 @@ fun LibraryConfig.toJson(): String = JSONObject()
     .put("assignments", JSONArray(assignments.map { (app, group) -> JSONObject().put("app", app).put("group", group) }))
     .put("pinned", JSONArray(pinned))
     .put("order", JSONArray(groupOrder))
+    .put("gridOrder", JSONArray(gridOrder))
+    .put("groupApps", JSONArray(groupAppOrder.map { (id, apps) -> JSONObject().put("id", id).put("apps", JSONArray(apps)) }))
     .toString()
 
 /** Parses [toJson] output; defaults for a missing or unreadable value. */
@@ -49,6 +51,13 @@ fun libraryConfigFromJson(json: String?): LibraryConfig {
         assignments = assignments.entries.toList().takeLast(MAX_STORED_ENTRIES).associate { it.key to it.value },
         pinned = root.optJSONArray("pinned").strings().distinct().takeLast(MAX_STORED_ENTRIES),
         groupOrder = root.optJSONArray("order").strings().distinct().take(MAX_STORED_ENTRIES),
+        gridOrder = root.optJSONArray("gridOrder").strings().distinct().take(MAX_STORED_ENTRIES),
+        groupAppOrder = root.optJSONArray("groupApps").objects().take(MAX_STORED_ENTRIES).mapNotNull { obj ->
+            val id = obj.optString("id").takeIf {
+                LibraryIds.systemCategory(it) != null || categories.any { category -> category.id == it }
+            } ?: return@mapNotNull null
+            id to obj.optJSONArray("apps").strings().distinct().take(MAX_STORED_ENTRIES)
+        }.toMap(),
     )
 }
 
