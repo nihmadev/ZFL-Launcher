@@ -32,6 +32,13 @@ class ContinuousRoundedShape private constructor(
     fun cornerRadius(size: Size, density: Density): Float =
         radiusDp?.let { with(density) { it.toPx() } } ?: (size.minDimension * radiusRatio!!)
 
+    // Equal shapes compare equal, so a shape created in composition doesn't invalidate the
+    // outline, clip and border caches of the modifiers using it on every recomposition.
+    override fun equals(other: Any?): Boolean =
+        other is ContinuousRoundedShape && other.radiusDp == radiusDp && other.radiusRatio == radiusRatio
+
+    override fun hashCode(): Int = 31 * radiusDp.hashCode() + radiusRatio.hashCode()
+
     companion object {
         /** Corner radius as a fraction of the shorter side, e.g. `0.225f` for app icons. */
         fun ratio(ratio: Float): ContinuousRoundedShape = ContinuousRoundedShape(null, ratio)
