@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +46,7 @@ import com.zfl.launcher.ui.home.pageTransition
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
+import com.zfl.launcher.ui.shape.shapeBorder
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -179,7 +179,7 @@ private fun MiniPage(apps: List<AppInfo>, modifier: Modifier = Modifier) {
         modifier
             .clip(shape)
             .background(Color.White.copy(alpha = 0.07f))
-            .border(1.dp, Color.White.copy(alpha = 0.15f), shape)
+            .shapeBorder(1.dp, Color.White.copy(alpha = 0.15f), shape)
             .padding(10.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {

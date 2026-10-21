@@ -2,7 +2,6 @@ package com.zfl.launcher.ui.settings
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.graphics.drawable.toBitmap
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.data.ImportPreview
@@ -168,7 +168,7 @@ private fun ConfirmImportDialog(launcherName: String, onConfirm: () -> Unit, onD
             Modifier
                 .width(290.dp)
                 .background(Color(0xF02C2C2E), shape)
-                .border(1.dp, SettingsStyle.CardStroke, shape),
+                .shapeBorder(1.dp, SettingsStyle.CardStroke, shape),
         ) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 16.dp)) {
                 Text(

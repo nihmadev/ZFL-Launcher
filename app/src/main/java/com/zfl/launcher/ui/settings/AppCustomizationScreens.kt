@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.R
 import com.zfl.launcher.data.AppInfo
@@ -150,14 +150,13 @@ internal fun AppCapsule(
     subtitle: String? = null,
     trailing: @Composable () -> Unit,
 ) {
-    val shape = ContinuousRoundedShape(22.dp)
     Box(
         Modifier
             .padding(bottom = 10.dp)
             .fillMaxWidth()
-            .clip(shape)
+            .clip(CapsuleShape)
             .background(SettingsStyle.GlassCard)
-            .border(1.dp, SettingsStyle.CardStroke, shape),
+            .shapeBorder(1.dp, SettingsStyle.CardStroke, CapsuleShape),
     ) {
         SettingsRow(onClick = onClick) {
             AppIconImage(app, size = 34.dp)
@@ -170,6 +169,8 @@ internal fun AppCapsule(
         }
     }
 }
+
+private val CapsuleShape = ContinuousRoundedShape(22.dp)
 
 @Composable
 private fun ResetButton(onClick: () -> Unit) {
@@ -197,7 +198,7 @@ private fun RenameDialog(originalLabel: String, currentLabel: String, onDismiss:
             Modifier
                 .width(290.dp)
                 .background(Color(0xF02C2C2E), shape)
-                .border(1.dp, SettingsStyle.CardStroke, shape),
+                .shapeBorder(1.dp, SettingsStyle.CardStroke, shape),
         ) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 16.dp)) {
                 Text(
@@ -229,7 +230,7 @@ private fun RenameDialog(originalLabel: String, currentLabel: String, onDismiss:
                         .fillMaxWidth()
                         .focusRequester(focus)
                         .background(Color(0xFF1C1C1E), ContinuousRoundedShape(10.dp))
-                        .border(1.dp, SettingsStyle.CardStroke, ContinuousRoundedShape(10.dp))
+                        .shapeBorder(1.dp, SettingsStyle.CardStroke, ContinuousRoundedShape(10.dp))
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                 )
             }

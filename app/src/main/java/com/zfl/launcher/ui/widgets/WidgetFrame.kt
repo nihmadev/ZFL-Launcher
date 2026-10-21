@@ -15,7 +15,6 @@ import com.zfl.launcher.data.AppWidgetEntry
 import com.zfl.launcher.data.PageWidgetEntry
 import com.zfl.launcher.data.WidgetStackEntry
 import android.view.ViewGroup
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +42,7 @@ import com.zfl.launcher.data.WidgetKind
 import com.zfl.launcher.data.WidgetSize
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.theme.Tokens
 
 /**
@@ -119,9 +119,9 @@ private fun Modifier.widgetBackground(entry: WidgetEntry, shape: ContinuousRound
     WidgetKind.Weather -> {
         val forecast = LocalWidgetEnvironment.current.weather.forecast
         background(weatherBrush(forecast?.condition, forecast?.isDay ?: false), shape)
-            .border(1.dp, WidgetStroke, shape)
+            .shapeBorder(1.dp, WidgetStroke, shape)
     }
-    else -> background(Tokens.WidgetBackground, shape).border(1.dp, WidgetStroke, shape)
+    else -> background(Tokens.WidgetBackground, shape).shapeBorder(1.dp, WidgetStroke, shape)
 }
 
 private val WidgetStroke = Color.White.copy(alpha = 0.10f)

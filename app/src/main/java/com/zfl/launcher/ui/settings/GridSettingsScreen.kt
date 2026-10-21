@@ -1,6 +1,5 @@
 package com.zfl.launcher.ui.settings
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +30,7 @@ import com.zfl.launcher.settings.GridAlignment
 import com.zfl.launcher.settings.GridMargins
 import com.zfl.launcher.ui.home.HomePreview
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.theme.LocalAccent
 import com.zfl.launcher.ui.theme.Tokens
 import kotlinx.coroutines.launch
@@ -74,7 +74,7 @@ fun GridSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
                     modifier = Modifier
                         .width(232.dp)
                         .clip(shape)
-                        .border(2.dp, Color.White.copy(alpha = 0.3f), shape),
+                        .shapeBorder(2.dp, Color.White.copy(alpha = 0.3f), shape),
                 )
             }
         }

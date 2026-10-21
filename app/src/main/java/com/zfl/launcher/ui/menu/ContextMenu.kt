@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -70,6 +69,7 @@ import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.data.FolderEntry
 import com.zfl.launcher.data.HomeEntry
 import com.zfl.launcher.data.WidgetEntry
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.widgets.PageWidgetBody
 import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.PageWidgetEntry
@@ -234,7 +234,7 @@ private fun MenuCard(
             .width(Tokens.MenuWidth)
             .clip(shape)
             .background(Tokens.MenuBackground)
-            .border(1.dp, Tokens.MenuStroke, shape)
+            .shapeBorder(1.dp, Tokens.MenuStroke, shape)
             .padding(vertical = Tokens.MenuVerticalPadding),
     ) {
         header?.invoke()

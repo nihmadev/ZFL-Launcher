@@ -14,7 +14,6 @@ import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.WallpaperBlur
 import com.zfl.launcher.ui.glass.glassStyle
 import com.zfl.launcher.ui.glass.isLiquidGlassSupported
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,6 +58,7 @@ import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.home.HomePreview
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.theme.Tokens
 import kotlin.math.roundToInt
 
@@ -291,7 +291,7 @@ fun HomeScreenSettingsScreen(vm: SettingsViewModel, onBack: () -> Unit) {
                     modifier = Modifier
                         .width(200.dp)
                         .clip(shape)
-                        .border(2.dp, Color.White.copy(alpha = 0.3f), shape),
+                        .shapeBorder(2.dp, Color.White.copy(alpha = 0.3f), shape),
                 )
             }
         }

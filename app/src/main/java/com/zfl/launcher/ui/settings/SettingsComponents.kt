@@ -1,7 +1,6 @@
 package com.zfl.launcher.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -41,6 +40,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.theme.launcherHaptics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -129,7 +129,7 @@ fun SettingsCard(modifier: Modifier = Modifier, content: @Composable () -> Unit)
     } else {
         Modifier
             .background(SettingsStyle.SolidCard, SettingsStyle.CardShape)
-            .border(1.dp, SettingsStyle.CardStroke, SettingsStyle.CardShape)
+            .shapeBorder(1.dp, SettingsStyle.CardStroke, SettingsStyle.CardShape)
     }
     CompositionLocalProvider(LocalGlassStyle provides glassStyle.copy(mode = GlassMode.Frosted)) {
         Layout(
@@ -245,7 +245,7 @@ fun IconTile(icon: ImageVector, color: Color, modifier: Modifier = Modifier) {
             .size(SettingsStyle.IconTileSize)
             .clip(shape)
             .background(background)
-            .then(if (settings.iconEdge) Modifier.border(Tokens.GlassStrokeWidth, TileEdge, shape) else Modifier),
+            .then(if (settings.iconEdge) Modifier.shapeBorder(Tokens.GlassStrokeWidth, TileEdge, shape) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = glyph, modifier = Modifier.size(19.dp))
