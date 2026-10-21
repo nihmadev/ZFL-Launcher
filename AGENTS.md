@@ -96,7 +96,7 @@ grep -E '^(some|full)' /proc/pressure/memory 2>/dev/null || echo "PSI memory: un
 ```
 
 - **Do not start a heavy task** if any of these hold:
-  - `MemAvailable` is below **6 GiB**;
+  - `MemAvailable` is below **~2 GiB**;
   - `load1 / cores` is above **0.5** (CPU is busy; the sample is taken right before the build, so a single high reading counts);
   - PSI `some avg10` for memory is above **1.00** (the system is already under memory pressure);
   - a Gradle daemon or another build is already running (`pgrep -fa 'GradleDaemon|gradlew'` finds a match, excluding the one you are about to start).
