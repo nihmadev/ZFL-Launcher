@@ -355,6 +355,17 @@
     <string name="island_top_offset">Вертикални помак</string>
     <string name="island_blur_footer">Замућење ради где га Android дозвољава: не у уштеди батерије нити са искљученим замућењем прозора.</string>
     <string name="island_access_unavailable">Овај екран приступа није доступан</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Панел фасцикле</string>
+    <string name="folders_width">Ширина</string>
+    <string name="folders_height">Висина</string>
+    <string name="folders_dim">Затамњење позадине</string>
+    <string name="folders_custom_glass">Посебно стакло фасцикли</string>
+    <string name="folders_content">Садржај</string>
+    <string name="folders_show_title">Прикажи назив фасцикле</string>
+    <string name="folders_title_size">Величина назива фасцикле</string>
+    <string name="folders_page_indicator">Индикатор страница</string>
+    <string name="folders_app_icons">Иконе и називи апликација</string>
     <string name="badges_section">Бројачи обавештења</string>
     <string name="badges_off">Искључено</string>
     <string name="badges_number">Број</string>

@@ -357,6 +357,17 @@
     <string name="island_top_offset">Зрух па вертыкалі</string>
     <string name="island_blur_footer">Размыццё працуе, дзе Android яго дазваляе: не ў рэжыме эканоміі зараду і не з адключаным размыццём вокнаў.</string>
     <string name="island_access_unavailable">Экран доступу недаступны</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Панэль папкі</string>
+    <string name="folders_width">Шырыня</string>
+    <string name="folders_height">Вышыня</string>
+    <string name="folders_dim">Зацямненне фону</string>
+    <string name="folders_custom_glass">Сваё шкло для папак</string>
+    <string name="folders_content">Змесціва</string>
+    <string name="folders_show_title">Паказваць назву папкі</string>
+    <string name="folders_title_size">Памер назвы папкі</string>
+    <string name="folders_page_indicator">Індыкатар старонак</string>
+    <string name="folders_app_icons">Значкі і подпісы праграм</string>
     <string name="badges_section">Лічыльнікі апавяшчэнняў</string>
     <string name="badges_off">Выкл.</string>
     <string name="badges_number">Лік</string>

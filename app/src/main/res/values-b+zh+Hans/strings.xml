@@ -350,6 +350,17 @@
     <string name="island_top_offset">垂直偏移</string>
     <string name="island_blur_footer">模糊仅在 Android 允许时生效：省电模式或关闭窗口模糊时不可用。</string>
     <string name="island_access_unavailable">此访问设置页面不可用</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">文件夹面板</string>
+    <string name="folders_width">宽度</string>
+    <string name="folders_height">高度</string>
+    <string name="folders_dim">背景变暗</string>
+    <string name="folders_custom_glass">自定义文件夹玻璃</string>
+    <string name="folders_content">内容</string>
+    <string name="folders_show_title">显示文件夹名称</string>
+    <string name="folders_title_size">文件夹名称大小</string>
+    <string name="folders_page_indicator">页面指示器</string>
+    <string name="folders_app_icons">应用图标和名称</string>
     <string name="badges_section">通知标记</string>
     <string name="badges_off">关闭</string>
     <string name="badges_number">数字</string>

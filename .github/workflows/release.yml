@@ -59,6 +59,16 @@ jobs:
         with:
           cache-read-only: true
 
+      # Hosted runners have 16 GB; the project defaults are sized for a small desktop.
+      - name: Raise Gradle memory limits
+        if: steps.version.outputs.new == 'true'
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties <<'EOF'
+          kotlin.daemon.jvmargs=-Xmx3g
+          org.gradle.workers.max=4
+          EOF
+
       - name: Restore signing keystore
         if: steps.version.outputs.new == 'true'
         env:

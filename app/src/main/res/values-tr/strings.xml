@@ -353,6 +353,17 @@
     <string name="island_top_offset">Dikey kaydırma</string>
     <string name="island_blur_footer">Bulanıklık, Android\'in izin verdiği yerde çalışır: pil tasarrufunda veya pencere bulanıklığı kapalıyken çalışmaz.</string>
     <string name="island_access_unavailable">Bu erişim ekranı kullanılamıyor</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Klasör paneli</string>
+    <string name="folders_width">Genişlik</string>
+    <string name="folders_height">Yükseklik</string>
+    <string name="folders_dim">Arka plan karartma</string>
+    <string name="folders_custom_glass">Özel klasör camı</string>
+    <string name="folders_content">İçerik</string>
+    <string name="folders_show_title">Klasör adını göster</string>
+    <string name="folders_title_size">Klasör adı boyutu</string>
+    <string name="folders_page_indicator">Sayfa göstergesi</string>
+    <string name="folders_app_icons">Uygulama simgeleri ve adları</string>
     <string name="badges_section">Bildirim Rozetleri</string>
     <string name="badges_off">Kapalı</string>
     <string name="badges_number">Sayı</string>

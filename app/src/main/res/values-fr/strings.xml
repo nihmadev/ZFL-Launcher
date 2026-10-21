@@ -355,6 +355,17 @@
     <string name="island_top_offset">Décalage vertical</string>
     <string name="island_blur_footer">Le flou fonctionne là où Android le permet : pas en économiseur de batterie ni avec le flou des fenêtres désactivé.</string>
     <string name="island_access_unavailable">Cet écran d’accès est indisponible</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Panneau du dossier</string>
+    <string name="folders_width">Largeur</string>
+    <string name="folders_height">Hauteur</string>
+    <string name="folders_dim">Assombrissement de l’arrière-plan</string>
+    <string name="folders_custom_glass">Verre personnalisé des dossiers</string>
+    <string name="folders_content">Contenu</string>
+    <string name="folders_show_title">Afficher le nom du dossier</string>
+    <string name="folders_title_size">Taille du nom du dossier</string>
+    <string name="folders_page_indicator">Indicateur de page</string>
+    <string name="folders_app_icons">Icônes et noms des apps</string>
     <string name="badges_section">Pastilles de notification</string>
     <string name="badges_off">Désactivé</string>
     <string name="badges_number">Nombre</string>

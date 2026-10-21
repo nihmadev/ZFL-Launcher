@@ -354,6 +354,17 @@
     <string name="island_top_offset">Deslocamento vertical</string>
     <string name="island_blur_footer">O desfoque funciona onde o Android o permite: não em poupança de bateria nem com o desfoque de janelas desativado.</string>
     <string name="island_access_unavailable">Este ecrã de acesso está indisponível</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Painel da pasta</string>
+    <string name="folders_width">Largura</string>
+    <string name="folders_height">Altura</string>
+    <string name="folders_dim">Escurecimento do fundo</string>
+    <string name="folders_custom_glass">Vidro próprio das pastas</string>
+    <string name="folders_content">Conteúdo</string>
+    <string name="folders_show_title">Mostrar nome da pasta</string>
+    <string name="folders_title_size">Tamanho do nome da pasta</string>
+    <string name="folders_page_indicator">Indicador de página</string>
+    <string name="folders_app_icons">Ícones e nomes dos apps</string>
     <string name="badges_section">Indicadores de notificação</string>
     <string name="badges_off">Desativado</string>
     <string name="badges_number">Número</string>

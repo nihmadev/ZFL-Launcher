@@ -357,6 +357,17 @@
     <string name="island_top_offset">Przesunięcie w pionie</string>
     <string name="island_blur_footer">Rozmycie działa tam, gdzie pozwala Android: nie w oszczędzaniu baterii ani przy wyłączonym rozmyciu okien.</string>
     <string name="island_access_unavailable">Ten ekran dostępu jest niedostępny</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Panel folderu</string>
+    <string name="folders_width">Szerokość</string>
+    <string name="folders_height">Wysokość</string>
+    <string name="folders_dim">Przyciemnienie tła</string>
+    <string name="folders_custom_glass">Własne szkło folderów</string>
+    <string name="folders_content">Zawartość</string>
+    <string name="folders_show_title">Pokaż nazwę folderu</string>
+    <string name="folders_title_size">Rozmiar nazwy folderu</string>
+    <string name="folders_page_indicator">Wskaźnik stron</string>
+    <string name="folders_app_icons">Ikony i podpisy aplikacji</string>
     <string name="badges_section">Plakietki powiadomień</string>
     <string name="badges_off">Wył.</string>
     <string name="badges_number">Liczba</string>

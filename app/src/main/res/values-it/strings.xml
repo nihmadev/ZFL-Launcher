@@ -355,6 +355,17 @@
     <string name="island_top_offset">Spostamento verticale</string>
     <string name="island_blur_footer">La sfocatura funziona dove Android la consente: non con il risparmio energetico né con la sfocatura delle finestre disattivata.</string>
     <string name="island_access_unavailable">Questa schermata di accesso non è disponibile</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Pannello cartella</string>
+    <string name="folders_width">Larghezza</string>
+    <string name="folders_height">Altezza</string>
+    <string name="folders_dim">Oscuramento dello sfondo</string>
+    <string name="folders_custom_glass">Vetro personalizzato cartelle</string>
+    <string name="folders_content">Contenuto</string>
+    <string name="folders_show_title">Mostra nome cartella</string>
+    <string name="folders_title_size">Dimensione nome cartella</string>
+    <string name="folders_page_indicator">Indicatore di pagina</string>
+    <string name="folders_app_icons">Icone e nomi delle app</string>
     <string name="badges_section">Badge delle notifiche</string>
     <string name="badges_off">Disattivato</string>
     <string name="badges_number">Numero</string>

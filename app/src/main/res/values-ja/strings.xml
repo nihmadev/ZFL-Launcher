@@ -350,6 +350,17 @@
     <string name="island_top_offset">縦方向の位置</string>
     <string name="island_blur_footer">ぼかしは Android が許可する場合に有効です（バッテリーセーバー中やウィンドウのぼかしがオフの場合は無効）。</string>
     <string name="island_access_unavailable">このアクセス設定画面を利用できません</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">フォルダパネル</string>
+    <string name="folders_width">幅</string>
+    <string name="folders_height">高さ</string>
+    <string name="folders_dim">背景の暗さ</string>
+    <string name="folders_custom_glass">フォルダ専用のガラス</string>
+    <string name="folders_content">内容</string>
+    <string name="folders_show_title">フォルダ名を表示</string>
+    <string name="folders_title_size">フォルダ名のサイズ</string>
+    <string name="folders_page_indicator">ページインジケータ</string>
+    <string name="folders_app_icons">アプリのアイコンと名前</string>
     <string name="badges_section">通知バッジ</string>
     <string name="badges_off">オフ</string>
     <string name="badges_number">数字</string>

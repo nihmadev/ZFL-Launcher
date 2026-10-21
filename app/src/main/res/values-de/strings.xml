@@ -352,6 +352,17 @@
     <string name="island_top_offset">Vertikaler Versatz</string>
     <string name="island_blur_footer">Unschärfe funktioniert, wo Android sie erlaubt: nicht im Energiesparmodus und nicht bei deaktivierter Fensterunschärfe.</string>
     <string name="island_access_unavailable">Diese Zugriffsseite ist nicht verfügbar</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Ordnerfenster</string>
+    <string name="folders_width">Breite</string>
+    <string name="folders_height">Höhe</string>
+    <string name="folders_dim">Hintergrundabdunklung</string>
+    <string name="folders_custom_glass">Eigenes Ordnerglas</string>
+    <string name="folders_content">Inhalt</string>
+    <string name="folders_show_title">Ordnername anzeigen</string>
+    <string name="folders_title_size">Größe des Ordnernamens</string>
+    <string name="folders_page_indicator">Seitenanzeige</string>
+    <string name="folders_app_icons">App-Symbole und -Namen</string>
     <string name="badges_section">Mitteilungskennzeichen</string>
     <string name="badges_off">Aus</string>
     <string name="badges_number">Zahl</string>

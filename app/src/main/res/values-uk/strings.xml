@@ -357,6 +357,17 @@
     <string name="island_top_offset">Зсув по вертикалі</string>
     <string name="island_blur_footer">Розмиття працює, де Android його дозволяє: не в режимі енергозбереження і не з вимкненим розмиттям вікон.</string>
     <string name="island_access_unavailable">Екран доступу недоступний</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Панель теки</string>
+    <string name="folders_width">Ширина</string>
+    <string name="folders_height">Висота</string>
+    <string name="folders_dim">Затемнення фону</string>
+    <string name="folders_custom_glass">Власне скло для тек</string>
+    <string name="folders_content">Вміст</string>
+    <string name="folders_show_title">Показувати назву теки</string>
+    <string name="folders_title_size">Розмір назви теки</string>
+    <string name="folders_page_indicator">Індикатор сторінок</string>
+    <string name="folders_app_icons">Значки та підписи застосунків</string>
     <string name="badges_section">Лічильники сповіщень</string>
     <string name="badges_off">Вимк.</string>
     <string name="badges_number">Число</string>

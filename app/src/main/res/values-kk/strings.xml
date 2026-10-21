@@ -353,6 +353,17 @@
     <string name="island_top_offset">Тік ығысу</string>
     <string name="island_blur_footer">Бұлдырату Android рұқсат еткенде жұмыс істейді: батареяны үнемдеу режимінде және терезе бұлдыратуы өшірілгенде емес.</string>
     <string name="island_access_unavailable">Рұқсаттар экраны қолжетімсіз</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Бума панелі</string>
+    <string name="folders_width">Ені</string>
+    <string name="folders_height">Биіктігі</string>
+    <string name="folders_dim">Фонды күңгірттеу</string>
+    <string name="folders_custom_glass">Бумаларға арналған жеке шыны</string>
+    <string name="folders_content">Мазмұны</string>
+    <string name="folders_show_title">Бума атауын көрсету</string>
+    <string name="folders_title_size">Бума атауының өлшемі</string>
+    <string name="folders_page_indicator">Бет индикаторы</string>
+    <string name="folders_app_icons">Қолданба белгішелері мен атаулары</string>
     <string name="badges_section">Хабарландыру белгілері</string>
     <string name="badges_off">Өшірулі</string>
     <string name="badges_number">Сан</string>

@@ -355,6 +355,17 @@
     <string name="island_top_offset">Desplazamiento vertical</string>
     <string name="island_blur_footer">El desenfoque funciona donde Android lo permite: no en ahorro de batería ni con el desenfoque de ventanas desactivado.</string>
     <string name="island_access_unavailable">Esta pantalla de acceso no está disponible</string>
+    <!-- Settings: folders -->
+    <string name="folders_panel">Panel de carpeta</string>
+    <string name="folders_width">Ancho</string>
+    <string name="folders_height">Alto</string>
+    <string name="folders_dim">Atenuación del fondo</string>
+    <string name="folders_custom_glass">Cristal propio de carpetas</string>
+    <string name="folders_content">Contenido</string>
+    <string name="folders_show_title">Mostrar nombre de carpeta</string>
+    <string name="folders_title_size">Tamaño del nombre de carpeta</string>
+    <string name="folders_page_indicator">Indicador de página</string>
+    <string name="folders_app_icons">Iconos y nombres de apps</string>
     <string name="badges_section">Globos de notificación</string>
     <string name="badges_off">Desactivado</string>
     <string name="badges_number">Número</string>
