@@ -11,8 +11,22 @@ android {
         applicationId = "com.zfl.launcher"
         minSdk = 31
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 3
+        versionName = "0.3.0"
+    }
+
+    // CI signs releases with the project keystore passed through the environment; local
+    // release builds without it fall back to the debug key.
+    val releaseKeystore = providers.environmentVariable("ZFL_KEYSTORE_FILE").orNull
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = providers.environmentVariable("ZFL_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("ZFL_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("ZFL_KEY_PASSWORD").get()
+            }
+        }
     }
 
     buildTypes {
@@ -29,7 +43,7 @@ android {
             isShrinkResources = true
             isCrunchPngs = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
         }
     }
     compileOptions {
