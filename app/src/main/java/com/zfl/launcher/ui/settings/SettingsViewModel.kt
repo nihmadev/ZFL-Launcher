@@ -212,6 +212,11 @@ interface SettingsActions {
 
     fun requestDefaultHome()
     fun requestWallpaperAccess()
+    fun requestIslandWindowAccess(): Unit
+    /** App info, where Android lifts "restricted settings" for apps installed from a file. */
+    fun openIslandAppInfo(): Unit
+    fun requestIslandMusicAccess(): Unit
+    fun reconnectIsland(): Unit
     /** Switches ZFL's UI language (`null` = follow the system); recreates the activity. */
     fun setAppLanguage(tag: String?)
     /** "Get Started": marks the onboarding as done and goes home. */

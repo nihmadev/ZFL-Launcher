@@ -30,8 +30,8 @@ import com.zfl.launcher.ui.theme.Motion
 enum class SettingsRoute {
     Main, HomeBehavior, General, Grid, Transition, Animations, Glass, Icons, HomeScreen, ContextMenu,
     HiddenApps, AppIcons, AppNames, License, Import, Weather, FinishSetup, Language,
-    HomeIcons, DockIcons, FolderIcons,
-    AppLibrary, LibraryPinned, LibraryCategories, LibraryCategory,
+    HomeIcons, DockIcons, FolderIcons, Folders,
+    AppLibrary, LibraryPinned, LibraryCategories, LibraryCategory, Island,
 }
 
 /** Size settings page of each icon area. */
@@ -39,7 +39,7 @@ private val IconArea.route: SettingsRoute
     get() = when (this) {
         IconArea.Home -> SettingsRoute.HomeIcons
         IconArea.Dock -> SettingsRoute.DockIcons
-        IconArea.Folder -> SettingsRoute.FolderIcons
+        IconArea.Folder -> SettingsRoute.Folders
     }
 
 /**
@@ -83,6 +83,7 @@ fun SettingsApp(vm: SettingsViewModel, actions: SettingsActions, initialRoute: S
             SettingsRoute.HomeIcons -> AreaIconsScreen(vm, IconArea.Home, back)
             SettingsRoute.DockIcons -> AreaIconsScreen(vm, IconArea.Dock, back)
             SettingsRoute.FolderIcons -> AreaIconsScreen(vm, IconArea.Folder, back)
+            SettingsRoute.Folders -> FolderSettingsScreen(vm, onOpenIcons = { navigate(SettingsRoute.FolderIcons) }, onBack = back)
             SettingsRoute.HomeBehavior -> HomeBehaviorScreen(vm, back)
             SettingsRoute.HomeScreen -> HomeScreenSettingsScreen(vm, back)
             SettingsRoute.ContextMenu -> MenuSettingsScreen(vm, back)
@@ -92,6 +93,7 @@ fun SettingsApp(vm: SettingsViewModel, actions: SettingsActions, initialRoute: S
             SettingsRoute.License -> LicenseScreen(back)
             SettingsRoute.Import -> ImportScreen(vm, back)
             SettingsRoute.Weather -> WeatherSettingsScreen(back)
+            SettingsRoute.Island -> IslandSettingsScreen(vm, actions, back)
             SettingsRoute.FinishSetup -> OnboardingFlow(vm, actions, OnboardingMode.FinishSetup, onFinish = back)
             SettingsRoute.AppLibrary -> LibrarySettingsScreen(vm, navigate, back)
             SettingsRoute.LibraryPinned -> LibraryPinnedScreen(vm, back)

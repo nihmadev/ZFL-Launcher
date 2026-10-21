@@ -6,6 +6,7 @@ import androidx.compose.material.icons.rounded.Animation
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Dock
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.Gavel
@@ -67,6 +68,7 @@ fun MainSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, navigate
         item {
             SettingsCard {
                 NavRow(Icons.Rounded.Settings, stringResource(R.string.row_general), onClick = { navigate(SettingsRoute.General) })
+                NavRow(Icons.Rounded.ViewCarousel, stringResource(R.string.island_title), onClick = { navigate(SettingsRoute.Island) }, tileColor = SettingsStyle.Tile.Purple)
                 NavRow(
                     Icons.Rounded.Translate,
                     stringResource(R.string.row_language),
@@ -108,6 +110,7 @@ fun MainSettingsScreen(vm: SettingsViewModel, actions: SettingsActions, navigate
                 )
                 NavRow(Icons.Rounded.BlurOn, stringResource(R.string.row_glass), onClick = { navigate(SettingsRoute.Glass) }, tileColor = SettingsStyle.Tile.Teal)
                 NavRow(Icons.Rounded.Apps, stringResource(R.string.row_icons), onClick = { navigate(SettingsRoute.Icons) }, tileColor = SettingsStyle.Tile.Orange)
+                NavRow(Icons.Rounded.Folder, stringResource(R.string.area_folders), onClick = { navigate(SettingsRoute.Folders) }, tileColor = SettingsStyle.Tile.Indigo)
                 NavRow(
                     Icons.Rounded.Dock,
                     stringResource(R.string.row_home_screen),

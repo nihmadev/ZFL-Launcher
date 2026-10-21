@@ -25,6 +25,7 @@ import com.zfl.launcher.ui.glass.LocalGlassStyle
 import com.zfl.launcher.ui.glass.WallpaperBlur
 import com.zfl.launcher.settings.AppLanguage
 import com.zfl.launcher.settings.LocalSettingsState
+import com.zfl.launcher.island.IslandAccess
 import com.zfl.launcher.ui.icon.IconLoader
 import com.zfl.launcher.ui.icon.LocalIconLoader
 import com.zfl.launcher.ui.onboarding.OnboardingFlow
@@ -111,6 +112,7 @@ class SettingsActivity : ComponentActivity(), SettingsActions {
         isDefaultHome = roleManager.isRoleHeld(RoleManager.ROLE_HOME)
         isHomeRoleAvailable = roleManager.isRoleAvailable(RoleManager.ROLE_HOME)
         hasWallpaperAccess = WallpaperBlur.hasAccess()
+        IslandAccess.refresh(this)
     }
 
     override fun requestDefaultHome() {
@@ -129,6 +131,35 @@ class SettingsActivity : ComponentActivity(), SettingsActions {
 
     override fun setAppLanguage(tag: String?) {
         AppLanguage.set(this, tag)
+    }
+
+    override fun requestIslandWindowAccess(): Unit {
+        // Apps can only open the list; the Island service is under "Downloaded apps" there.
+        openIslandAccess(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+    }
+
+    override fun openIslandAppInfo(): Unit {
+        openIslandAccess(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri()))
+    }
+
+    override fun requestIslandMusicAccess(): Unit {
+        // Not granted yet: the special-access list, including the OEM's entry flow. Granted: the
+        // listener's own page, where the allowed notification types (ongoing, alerting) live.
+        val granted = IslandAccess.read(this).notifications
+        val detail = Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+            .putExtra(Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, IslandAccess.component(this).flattenToString())
+        if (granted && detail.resolveActivity(packageManager) != null) openIslandAccess(detail)
+        else openIslandAccess(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    }
+
+    override fun reconnectIsland(): Unit {
+        runCatching { IslandAccess.requestConnection(this) }
+            .onFailure { android.widget.Toast.makeText(this, R.string.island_access_unavailable, android.widget.Toast.LENGTH_SHORT).show() }
+    }
+
+    private fun openIslandAccess(intent: Intent) {
+        runCatching { startActivity(intent) }
+            .onFailure { android.widget.Toast.makeText(this, R.string.island_access_unavailable, android.widget.Toast.LENGTH_SHORT).show() }
     }
 
     /**
