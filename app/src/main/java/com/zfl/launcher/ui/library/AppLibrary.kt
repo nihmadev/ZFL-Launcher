@@ -32,6 +32,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -53,11 +54,12 @@ import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.icon.IconLabel
 import com.zfl.launcher.ui.theme.Haptics
 import com.zfl.launcher.ui.theme.Tokens
+import com.zfl.launcher.ui.home.DragController
 
 /** What App Library icons report back. Bounds are in window coordinates. */
 interface LibraryCallbacks {
     fun onLaunch(app: AppInfo, bounds: Rect)
-    fun onLongPress(app: AppInfo, bounds: Rect)
+    fun onLongPress(app: AppInfo, bounds: Rect, pointer: Offset)
 }
 
 /**
@@ -74,6 +76,7 @@ fun AppLibraryPage(
     onViewChange: (LibraryView) -> Unit,
     callbacks: LibraryCallbacks,
     modifier: Modifier = Modifier,
+    drag: DragController? = null,
 ) {
     if (library == null) {
         Box(modifier.fillMaxSize())
@@ -83,10 +86,14 @@ fun AppLibraryPage(
     val cardsState = rememberLazyGridState(LibraryCacheWindow)
     val gridState = rememberLazyGridState(LibraryCacheWindow)
     val listState = rememberLazyListState(LibraryCacheWindow)
-    val header: @Composable () -> Unit = { LibraryHeader(library.view, onSearch, onViewChange) }
-    when (library.view) {
-        LibraryView.Categories -> CategoriesView(library, header, onOpenGroup, callbacks, cardsState, modifier)
-        LibraryView.Grid -> AllAppsGrid(library, header, callbacks, gridState, modifier)
+    val arranging = drag?.isDragging == true
+    val view = library.view
+    val header: @Composable () -> Unit = { LibraryHeader(view, onSearch, onViewChange) }
+    when (view) {
+        LibraryView.Categories -> CategoriesView(library, header, onOpenGroup, callbacks, cardsState, modifier, drag)
+        LibraryView.Grid -> if (arranging || library.manualGrid) {
+            LibraryPlacementGrid(library.gridApps, header, callbacks, gridState, drag, modifier)
+        } else AllAppsGrid(library, header, callbacks, gridState, modifier)
         LibraryView.List -> AllAppsList(library, header, callbacks, listState, modifier)
     }
 }
@@ -187,9 +194,10 @@ internal fun LibraryIcon(app: AppInfo, size: Dp, callbacks: LibraryCallbacks, mo
                         pressed = false
                     },
                     onTap = { callbacks.onLaunch(currentApp, bounds.current()) },
-                    onLongPress = {
+                    onLongPress = { position ->
                         haptic.performHapticFeedback(Haptics.Lift)
-                        callbacks.onLongPress(currentApp, bounds.current())
+                        val iconBounds = bounds.current()
+                        callbacks.onLongPress(currentApp, iconBounds, iconBounds.topLeft + position)
                     },
                 )
             },

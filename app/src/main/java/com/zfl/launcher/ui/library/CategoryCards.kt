@@ -33,12 +33,16 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.Role
@@ -55,10 +59,11 @@ import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Motion
 import com.zfl.launcher.ui.theme.Tokens
-
-private val CardShape = ContinuousRoundedShape(30.dp)
-private val CardPadding = 14.dp
-private val CardGap = 12.dp
+import com.zfl.launcher.ui.home.DragController
+import androidx.compose.ui.geometry.Offset
+import com.zfl.launcher.data.DropPosition
+import com.zfl.launcher.data.GroupKind
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 
 /**
  * The Categories view: pinned apps, the smart groups and every category as a card. Each card
@@ -73,11 +78,21 @@ internal fun CategoriesView(
     callbacks: LibraryCallbacks,
     state: LazyGridState,
     modifier: Modifier = Modifier,
+    drag: DragController? = null,
 ) {
+    val areas = remember { linkedMapOf<String, (Offset) -> DropPosition.Library?>() }
+    val owner = remember { Any() }
+    val bounds = remember { WindowBounds() }
+    DisposableEffect(drag) {
+        if (drag != null) drag.libraryTargets[owner] = { point -> areas.values.firstNotNullOfOrNull { it(point) } }
+        onDispose { drag?.libraryTargets?.remove(owner) }
+    }
+    LaunchedEffect(drag, state) { snapshotFlow { state.layoutInfo }.collect { drag?.refreshTarget() } }
+    LibraryDragScroll(drag, state, bounds, owner)
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         state = state,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize().then(bounds.modifier).onGloballyPositioned { drag?.refreshTarget() },
         contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -85,71 +100,7 @@ internal fun CategoriesView(
         item(key = "header", span = { GridItemSpan(2) }) { header() }
         // Group ids never collide with each other: system, user and smart ids have their own forms.
         items(library.cards, key = { "group:${it.id}" }) { group ->
-            CategoryCard(group, onOpenGroup = { onOpenGroup(group.id) }, callbacks = callbacks)
-        }
-    }
-}
-
-@Composable
-private fun CategoryCard(group: AppGroup, onOpenGroup: () -> Unit, callbacks: LibraryCallbacks) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        BoxWithConstraints(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .glass(CardShape, tint = Color.White.copy(alpha = 0.08f)),
-        ) {
-            val big = (maxWidth - CardPadding * 2 - CardGap) / 2
-            val showCluster = group.apps.size > 4
-            val bigApps = group.apps.take(if (showCluster) 3 else 4)
-            bigApps.forEachIndexed { index, app ->
-                LibraryIcon(
-                    app = app,
-                    size = big,
-                    callbacks = callbacks,
-                    modifier = Modifier.offset(
-                        x = CardPadding + (big + CardGap) * (index % 2),
-                        y = CardPadding + (big + CardGap) * (index / 2),
-                    ),
-                )
-            }
-            if (showCluster) {
-                MiniCluster(
-                    apps = group.apps.drop(3).take(4),
-                    size = big,
-                    onClick = onOpenGroup,
-                    modifier = Modifier.offset(x = CardPadding + big + CardGap, y = CardPadding + big + CardGap),
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            group.title,
-            color = Tokens.TextPrimary,
-            fontSize = 14.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onOpenGroup),
-        )
-    }
-}
-
-/** 2×2 tiny icons in the corner of a category card; tapping it opens the group. */
-@Composable
-private fun MiniCluster(apps: List<AppInfo>, size: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val gap = size * 0.1f
-    val mini = (size - gap) / 2
-    Box(
-        modifier
-            .size(size)
-            .clickable(interactionSource = null, indication = null, role = Role.Button, onClick = onClick),
-    ) {
-        apps.forEachIndexed { index, app ->
-            AppIconImage(
-                app = app,
-                size = mini,
-                modifier = Modifier.offset(x = (mini + gap) * (index % 2), y = (mini + gap) * (index / 2)),
-            )
+            CategoryCard(group, onOpenGroup = { onOpenGroup(group.id) }, callbacks = callbacks, drag = drag, areas = areas)
         }
     }
 }
@@ -160,10 +111,10 @@ private fun MiniCluster(apps: List<AppInfo>, size: Dp, onClick: () -> Unit, modi
  * place; the caller closes it when the group is gone.
  */
 @Composable
-fun CategoryOverlay(group: AppGroup?, callbacks: LibraryCallbacks, onClose: () -> Unit) {
+fun CategoryOverlay(group: AppGroup?, callbacks: LibraryCallbacks, onClose: () -> Unit, drag: DragController? = null) {
     var last by remember { mutableStateOf(group) }
     if (group != null) last = group
-    BackHandler(enabled = group != null, onBack = onClose)
+    BackHandler(enabled = group != null) { drag?.cancel(); onClose() }
     AnimatedVisibility(
         visible = group != null,
         enter = fadeIn(Motion.fade()) + scaleIn(Motion.expand(), initialScale = 0.92f),
@@ -190,7 +141,9 @@ fun CategoryOverlay(group: AppGroup?, callbacks: LibraryCallbacks, onClose: () -
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 56.dp, bottom = 28.dp),
                 )
-                LazyVerticalGrid(
+                if (drag?.isDragging == true && shown.kind !in listOf(GroupKind.Suggestions, GroupKind.Recent)) {
+                    LibraryPlacementGrid(shown.apps, null, callbacks, rememberLazyGridState(), drag, groupId = shown.id)
+                } else LazyVerticalGrid(
                     columns = GridCells.Fixed(Tokens.LibraryColumns),
                     contentPadding = PaddingValues(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),

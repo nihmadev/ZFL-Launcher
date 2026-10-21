@@ -152,16 +152,18 @@ private fun LetterIndex(letters: List<String>, onLetter: (String) -> Unit, modif
 internal fun AppListRow(app: AppInfo, callbacks: LibraryCallbacks) {
     val haptic = launcherHaptics()
     val bounds = remember { WindowBounds() }
+    val rowBounds = remember { WindowBounds() }
     val currentApp by rememberUpdatedState(app)
     Row(
         Modifier
             .fillMaxWidth()
+            .then(rowBounds.modifier)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { callbacks.onLaunch(currentApp, bounds.current()) },
-                    onLongPress = {
+                    onLongPress = { position ->
                         haptic.performHapticFeedback(Haptics.Lift)
-                        callbacks.onLongPress(currentApp, bounds.current())
+                        callbacks.onLongPress(currentApp, bounds.current(), rowBounds.current().topLeft + position)
                     },
                 )
             }
