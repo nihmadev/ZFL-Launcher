@@ -1,14 +1,11 @@
 package com.zfl.launcher.ui.home
 
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.widgets.PageWidgetBody
 import com.zfl.launcher.data.PageWidgetEntry
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.LaunchedEffect
-import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.GridSpec
 import androidx.compose.ui.unit.Dp
 import com.zfl.launcher.settings.LocalSettingsState
@@ -164,11 +161,9 @@ internal fun PageContent(
             alignment = settings.gridAlignment,
             cells = cells,
             header = if (showGlassPrompt) ({ GlassPrompt(onGlassPrompt) }) else null,
-            marker = drag.pageMarker(page),
-            markerSquare = (drag.session?.entry as? PageWidgetEntry)?.isSquare == true,
             onGeometry = {
                 geometry = it
-                if (isCurrent) drag.pageGrid = it
+                if (isCurrent) drag.updatePageGrid(it)
             },
             dropOrigin = drag::takeDropOrigin,
         ) { entry, slot ->
@@ -200,38 +195,40 @@ internal fun PageContent(
     }
 }
 
-/**
- * Faint outline where the dragged item will land: an icon-sized tile, or a widget-sized
- * card for widgets. Fades in so it doesn't flicker while the target is still moving.
- */
+/** Faint outline of an empty App Library slot an app can be dropped into. */
 @Composable
-internal fun DropMarker(span: Span, iconSize: Dp, modifier: Modifier = Modifier, square: Boolean = false) {
+internal fun DropMarker(iconSize: Dp, modifier: Modifier = Modifier) {
     val settings = LocalSettingsState.current
     val alpha = remember { Animatable(0f) }
     LaunchedEffect(Unit) { alpha.animateTo(1f, tween(Motion.MARKER_FADE_MS)) }
-    val fade = Modifier.graphicsLayer { this.alpha = alpha.value }
-    if (span == Span.One) {
-        val shape = IconShape(settings.iconCorner)
-        Box(modifier, contentAlignment = Alignment.TopCenter) {
-            Box(fade.size(iconSize).background(DropMarkerFill, shape).border(1.dp, DropMarkerStroke, shape))
-        }
-    } else {
-        BoxWithConstraints(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            val body = widgetBodySize(DpSize(maxWidth, maxHeight), span, square, iconSize, withLabel = false)
-            val shape = ContinuousRoundedShape(22.dp)
-            Box(fade.size(body).background(DropMarkerFill, shape).border(1.dp, DropMarkerStroke, shape))
-        }
+    val shape = IconShape(settings.iconCorner)
+    Box(modifier, contentAlignment = Alignment.TopCenter) {
+        Box(
+            Modifier
+                .graphicsLayer { this.alpha = alpha.value }
+                .size(iconSize)
+                .background(DropMarkerFill, shape)
+                .shapeBorder(1.dp, DropMarkerStroke, shape),
+        )
     }
 }
 
 private val DropMarkerFill = Color.White.copy(alpha = 0.10f)
 private val DropMarkerStroke = Color.White.copy(alpha = 0.22f)
 
-/** The icon under the finger while dragging, as big as it was where it was picked up: slightly bigger, floating above everything. */
+/**
+ * The item under the finger while dragging, iOS style: it lifts off the grid with a spring,
+ * grows a little and casts a soft shadow, without its label. No outline marks the target:
+ * the other icons make room for it instead.
+ */
 @Composable
 internal fun DraggedIcon(drag: DragController) {
     val session = drag.session?.takeIf { it.active } ?: return
     val size = with(LocalDensity.current) { DpSize(session.itemSize.width.toDp(), session.itemSize.height.toDp()) }
+    val lift = remember(session) { Animatable(1f) }
+    LaunchedEffect(lift) { lift.animateTo(Motion.LIFT_SCALE, Motion.pop()) }
+    val iconCorner = LocalSettingsState.current.iconCorner
+    val shape = if (session.entry is PageWidgetEntry) ContinuousRoundedShape(Tokens.WidgetRadius) else IconShape(iconCorner)
     Box(
         Modifier
             .offset {
@@ -239,9 +236,12 @@ internal fun DraggedIcon(drag: DragController) {
                 IntOffset(topLeft.x.roundToInt(), topLeft.y.roundToInt())
             }
             .graphicsLayer {
-                scaleX = 1.12f
-                scaleY = 1.12f
-                alpha = 0.95f
+                scaleX = lift.value
+                scaleY = lift.value
+                // The shadow grows in as the item rises.
+                shadowElevation = Tokens.DragShadow.toPx() * ((lift.value - 1f) / (Motion.LIFT_SCALE - 1f)).coerceIn(0f, 1f)
+                this.shape = shape
+                clip = false
             },
     ) {
         when (val entry = session.entry) {

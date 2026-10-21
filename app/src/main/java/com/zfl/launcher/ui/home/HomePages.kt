@@ -28,4 +28,10 @@ data class HomePages(val homes: Int, val today: Boolean, val library: Boolean) {
         HomePage.Library -> "library"
         is HomePage.Desktop -> "home_${page.ordinal}"
     }
+
+    /** Drag page indices exclude Today; only individual apps can enter the library. */
+    fun dragNeighbor(current: Int, direction: Int, allowLibrary: Boolean): Int? {
+        val last = if (library && allowLibrary) homeCount else homeCount - 1
+        return (current + direction).takeIf { direction != 0 && it in 0..last }
+    }
 }

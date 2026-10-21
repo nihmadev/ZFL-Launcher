@@ -53,6 +53,7 @@ interface HomeIconCallbacks {
  * @param jiggleSeed varies the jiggle phase per icon (its position works well).
  * @param hidden keeps the slot but draws nothing (the icon is lifted by the menu).
  * @param mergeTarget an app is hovering over this one and will make a folder.
+ * @param labelModifier lets an expanding folder reveal names independently of the icons.
  */
 @Composable
 fun HomeIcon(
@@ -64,6 +65,7 @@ fun HomeIcon(
     modifier: Modifier = Modifier,
     hidden: Boolean = false,
     mergeTarget: Boolean = false,
+    labelModifier: Modifier = Modifier,
 ) {
     if (entry is PlaceholderEntry || entry is PageWidgetEntry) return
     val haptic = launcherHaptics()
@@ -140,14 +142,16 @@ fun HomeIcon(
         }
         if (slot.showLabel) {
             LabelSpacer()
-            IconLabel(
-                when (entry) {
-                    is AppEntry -> entry.app.label
-                    is FolderEntry -> entry.name
-                    is PlaceholderEntry, is PageWidgetEntry -> ""
-                },
-                scale = slot.labelScale,
-            )
+            Box(labelModifier) {
+                IconLabel(
+                    when (entry) {
+                        is AppEntry -> entry.app.label
+                        is FolderEntry -> entry.name
+                        is PlaceholderEntry, is PageWidgetEntry -> ""
+                    },
+                    scale = slot.labelScale,
+                )
+            }
         }
     }
 }

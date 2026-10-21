@@ -40,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -62,6 +63,7 @@ import com.zfl.launcher.data.Span
 import com.zfl.launcher.data.span
 import com.zfl.launcher.settings.LocalSettingsState
 import com.zfl.launcher.ui.glass.GlassProfile
+import com.zfl.launcher.ui.glass.FolderGlass
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.icon.AppIconImage
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
@@ -96,8 +98,6 @@ fun IconGrid(
     header: (@Composable () -> Unit)? = null,
     onGeometry: ((GridGeometry) -> Unit)? = null,
     dropOrigin: (String) -> Offset? = { null },
-    marker: Pair<Int, Span>? = null,
-    markerSquare: Boolean = false,
     cells: Map<String, Int> = emptyMap(),
     item: @Composable (HomeEntry, IconSlot) -> Unit,
 ) {
@@ -132,14 +132,6 @@ fun IconGrid(
                     (grid.columnOf(cell) * cellWidthPx).roundToInt(),
                     (grid.rowOf(cell) * cellHeightPx).roundToInt(),
                 )
-                marker?.let { (cell, span) ->
-                    key("dropMarker") {
-                        MarkerSlot(
-                            target = slotOffset(cell),
-                            modifier = Modifier.size(frame.cellWidth * span.columns, frame.cellHeight * span.rows),
-                        ) { DropMarker(span, frame.iconSize, square = markerSquare) }
-                    }
-                }
                 // Widgets take several cells; apps flow around them (see packCells).
                 val spans = entries.map { it.span }
                 val preferred = entries.map { cells[it.id] }
@@ -157,6 +149,8 @@ fun IconGrid(
                                 IntOffset(x.roundToInt(), (origin.y - originInWindow.y).roundToInt())
                             },
                             modifier = Modifier.size(frame.cellWidth * span.columns, frame.cellHeight * span.rows),
+                            // An icon shrinks back around its own center; a widget around its card.
+                            pivot = if (span == Span.One) TransformOrigin(0.5f, iconPx / 2 / cellHeightPx) else TransformOrigin.Center,
                         ) { item(entry, slot) }
                     }
                 }
@@ -165,20 +159,34 @@ fun IconGrid(
     }
 }
 
-/** A child that springs to [target] whenever it changes (starting from [initial] if given). */
+/**
+ * A child that springs to [target] whenever it changes. A just-dropped item starts at
+ * [initial], at its lifted size, and settles into the slot around [pivot] instead of popping.
+ */
 @Composable
-internal fun AnimatedSlot(target: IntOffset, initial: IntOffset?, modifier: Modifier, content: @Composable () -> Unit) {
+internal fun AnimatedSlot(
+    target: IntOffset,
+    initial: IntOffset?,
+    modifier: Modifier,
+    pivot: TransformOrigin = TransformOrigin.Center,
+    content: @Composable () -> Unit,
+) {
     val offset = remember { Animatable(initial ?: target, IntOffset.VectorConverter) }
+    val landing = remember { if (initial != null) Animatable(Motion.LIFT_SCALE) else null }
     LaunchedEffect(target) { offset.animateTo(target, SlotSpring) }
-    Box(modifier.offset { offset.value }, contentAlignment = Alignment.TopCenter) { content() }
-}
-
-/** The drop marker glides from slot to slot instead of jumping; it appears right where it is first shown. */
-@Composable
-internal fun MarkerSlot(target: IntOffset, modifier: Modifier, content: @Composable () -> Unit) {
-    val offset = remember { Animatable(target, IntOffset.VectorConverter) }
-    LaunchedEffect(target) { offset.animateTo(target, SlotSpring) }
-    Box(modifier.offset { offset.value }, contentAlignment = Alignment.TopCenter) { content() }
+    if (landing != null) LaunchedEffect(Unit) { landing.animateTo(1f, Motion.settle()) }
+    Box(
+        modifier
+            .offset { offset.value }
+            .then(
+                if (landing == null) Modifier else Modifier.graphicsLayer {
+                    scaleX = landing.value
+                    scaleY = landing.value
+                    transformOrigin = pivot
+                },
+            ),
+        contentAlignment = Alignment.TopCenter,
+    ) { content() }
 }
 
 /**
@@ -245,26 +253,27 @@ fun FolderIcon(
     size: Dp,
     highlighted: Boolean = false,
 ) {
-    val shape = IconShape(LocalSettingsState.current.iconCorner)
+    val settings = LocalSettingsState.current
+    val shape = IconShape(settings.iconCorner)
     val scale by animateFloatAsState(if (highlighted) 1.15f else 1f, Motion.bouncy(), label = "folderHover")
-    val padding = size * 0.13f
-    val gap = size * 0.05f
-    val mini = (size - padding * 2 - gap * 2) / 3
-    Box(
-        modifier
-            .size(size)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .glass(shape, tint = Color.White.copy(alpha = if (highlighted) 0.32f else 0.2f), profile = GlassProfile.Tile),
-    ) {
-        folder.apps.take(9).forEachIndexed { index, app ->
-            AppIconImage(
-                app = app,
-                size = mini,
-                modifier = Modifier.offset(
-                    x = padding + (mini + gap) * (index % 3),
-                    y = padding + (mini + gap) * (index / 3),
-                ),
-            )
+    FolderGlass(settings.folders) {
+        Box(
+            modifier
+                .size(size)
+                .graphicsLayer { scaleX = scale; scaleY = scale }
+                .glass(shape, tint = if (highlighted) Color.White.copy(alpha = 0.32f) else Color.Unspecified, profile = GlassProfile.Tile),
+        ) {
+            folder.apps.take(GridSpec.Folder.cellCount).forEachIndexed { index, app ->
+                val cell = folderPreviewCell(index)
+                AppIconImage(
+                    app = app,
+                    size = size * cell.size,
+                    modifier = Modifier.offset(
+                        x = size * cell.left,
+                        y = size * cell.top,
+                    ),
+                )
+            }
         }
     }
 }

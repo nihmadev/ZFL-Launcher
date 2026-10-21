@@ -146,7 +146,7 @@ fun HomePreview(
 
 /** An app, folder or widget with its label, without any touch handling. */
 @Composable
-private fun StaticIcon(entry: HomeEntry, slot: IconSlot) {
+internal fun StaticIcon(entry: HomeEntry, slot: IconSlot) {
     if (entry is PageWidgetEntry) {
         StaticWidget(entry, slot)
         return

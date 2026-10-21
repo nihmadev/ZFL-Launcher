@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import com.zfl.launcher.ui.theme.Tokens
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -116,6 +117,7 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
             scope = scope,
             slopPx = with(density) { 10.dp.toPx() },
             edgePx = with(density) { 28.dp.toPx() },
+            pageSwipePx = with(density) { Tokens.DragPageSwipeThreshold.toPx() },
             callbacks = HomeDragCallbacks(vm, scope, pager) { pagerMap.value.firstHome },
         )
     }
@@ -150,6 +152,7 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     val libraryPage = pageMap.libraryPosition
     SideEffect {
         drag.state = state
+        drag.pageMap = pageMap
         drag.currentPage = pager.currentPage - pageMap.firstHome
         drag.screenWidth = windowWidth
         drag.rtl = rtl
@@ -162,11 +165,17 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
             vm.exitEditMode()
         }
     }
+    LaunchedEffect(drag.isDragging) {
+        if (drag.isDragging && drag.session?.source == DragSource.Library) {
+            vm.library.close()
+            pager.scrollToPage(pageMap.firstHome + state.pages.lastIndex)
+        }
+    }
 
     val pageIcons = remember { iconCallbacks(vm, actions, drag, DragSource.Page) }
     val dockIcons = remember { iconCallbacks(vm, actions, drag, DragSource.Dock) }
     val folderIcons = remember { iconCallbacks(vm, actions, drag, DragSource.Folder) }
-    val libraryCallbacks = remember { libraryCallbacks(vm, actions) }
+    val libraryCallbacks = remember { libraryCallbacks(vm, actions, drag) }
     val searchCallbacks = remember { searchCallbacks(vm, actions) }
     val pageWidgets = remember { widgetCallbacks(vm, actions, drag, onToday = false) }
     val todayWidgets = remember { widgetCallbacks(vm, actions, drag, onToday = true) }
@@ -182,8 +191,9 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
     LaunchedEffect(dispatcher) {
         vm.returnToHome.collect { dispatcher.returned(vm.settings.state.value.homeBehavior.returnPolicy) }
     }
-    BackHandler(enabled = menu != null || openFolder != null || editMode) {
+    BackHandler(enabled = menu != null || openFolder != null || editMode || drag.isDragging) {
         when {
+            drag.isDragging -> { drag.cancel(); vm.exitEditMode() }
             menu != null -> vm.closeMenu()
             openFolder != null -> vm.closeFolder()
             else -> vm.exitEditMode()
@@ -280,7 +290,9 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                             onOpenGroup = vm.library::open,
                             onViewChange = vm.library::setView,
                             callbacks = libraryCallbacks,
-                            modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility),
+                            drag = drag,
+                            modifier = Modifier.padding(top = editInset)
+                                .windowInsetsPadding(WindowInsets.navigationBarsIgnoringVisibility),
                         )
                         return@HorizontalPager
                     }
@@ -350,7 +362,6 @@ fun HomeScreen(vm: LauncherViewModel, actions: LauncherActions) {
                         background = settings.dockBackground,
                         onBounds = { drag.dockBounds = it },
                         dropOrigin = drag::takeDropOrigin,
-                        marker = drag.dockMarker(),
                     ) { entry, slot ->
                         HomeIcon(
                             entry = entry,

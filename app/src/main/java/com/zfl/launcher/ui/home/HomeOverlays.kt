@@ -98,7 +98,7 @@ internal fun HomeOverlays(
     // last app (hidden, uninstalled) closes.
     val openGroup = openGroupId?.let { id -> library?.cards?.firstOrNull { it.id == id } }
     if (openGroupId != null && library != null && openGroup == null) LaunchedEffect(openGroupId) { vm.library.close() }
-    CategoryOverlay(group = openGroup, callbacks = libraryCallbacks, onClose = vm.library::close)
+    CategoryOverlay(group = openGroup, callbacks = libraryCallbacks, onClose = vm.library::close, drag = drag)
 
     SearchOverlay(
         mode = search,

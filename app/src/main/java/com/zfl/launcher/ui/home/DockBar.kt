@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.min
 import com.zfl.launcher.data.HomeEntry
-import com.zfl.launcher.data.Span
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
 import com.zfl.launcher.ui.theme.Tokens
@@ -51,7 +50,6 @@ fun DockBar(
     background: Boolean = true,
     onBounds: ((Rect) -> Unit)? = null,
     dropOrigin: (String) -> Offset? = { null },
-    marker: Pair<Int, Int>? = null,
     item: @Composable (HomeEntry, IconSlot) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -74,13 +72,7 @@ fun DockBar(
             val slotWidthPx = widthPx / entries.size.coerceAtLeast(1)
             val slotWidth = with(density) { slotWidthPx.toDp() }
             val slot = IconSlot(iconSize, min(iconSize + DockItemMargin * 2, slotWidth), metrics.showLabels, metrics.labelScale)
-            marker?.let { (index, count) ->
-                val markerSlotWidth = widthPx / count.coerceAtLeast(1)
-                MarkerSlot(
-                    target = IntOffset((markerSlotWidth * index + (markerSlotWidth - iconPx) / 2).roundToInt(), topPx.roundToInt()),
-                    modifier = Modifier.size(iconSize),
-                ) { DropMarker(Span.One, iconSize) }
-            }
+            val contentHeightPx = with(density) { contentHeight.toPx() }
             entries.forEachIndexed { index, entry ->
                 key(entry.id) {
                     AnimatedSlot(
@@ -92,6 +84,7 @@ fun DockBar(
                             IntOffset(x.roundToInt(), (it.y - originInWindow.y).roundToInt())
                         },
                         modifier = Modifier.width(slotWidth).height(contentHeight),
+                        pivot = TransformOrigin(0.5f, iconPx / 2 / contentHeightPx),
                     ) { item(entry, slot) }
                 }
             }

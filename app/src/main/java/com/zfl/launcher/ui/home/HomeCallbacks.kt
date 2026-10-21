@@ -125,13 +125,17 @@ internal fun stackEditorActions(vm: LauncherViewModel): StackEditorActions = obj
     override fun close() = vm.stacks.closeEditor()
 }
 
-internal fun libraryCallbacks(vm: LauncherViewModel, actions: LauncherActions): LibraryCallbacks = object : LibraryCallbacks {
+internal fun libraryCallbacks(vm: LauncherViewModel, actions: LauncherActions, drag: DragController): LibraryCallbacks = object : LibraryCallbacks {
     override fun onLaunch(app: AppInfo, bounds: Rect) {
         vm.library.close()
         actions.launch(app, bounds)
     }
 
-    override fun onLongPress(app: AppInfo, bounds: Rect) = vm.openMenu(AppEntry(app), bounds, inDock = false, inLibrary = true)
+    override fun onLongPress(app: AppInfo, bounds: Rect, pointer: Offset) {
+        val entry = AppEntry(app)
+        vm.openMenu(entry, bounds, inDock = false, inLibrary = true)
+        if (vm.canArrange) drag.prepare(entry, DragSource.Library, bounds, pointer)
+    }
 }
 
 internal fun libraryMenuActions(vm: LauncherViewModel): LibraryMenuActions = object : LibraryMenuActions {
@@ -170,6 +174,7 @@ internal class HomeDragCallbacks(
     override fun onDrop(id: String, position: DropPosition) = vm.drop(id, position)
 
     override fun onFlipPage(page: Int) {
+        vm.library.close()
         scope.launch { pager.animateScrollToPage(page + firstHomePage()) }
     }
 

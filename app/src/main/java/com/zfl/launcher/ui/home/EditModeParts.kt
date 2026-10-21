@@ -1,7 +1,6 @@
 package com.zfl.launcher.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -46,6 +45,7 @@ import com.zfl.launcher.data.AppInfo
 import com.zfl.launcher.ui.glass.GlassProfile
 import com.zfl.launcher.ui.glass.glass
 import com.zfl.launcher.ui.shape.ContinuousRoundedShape
+import com.zfl.launcher.ui.shape.shapeBorder
 import com.zfl.launcher.ui.theme.Tokens
 
 /**
@@ -116,7 +116,7 @@ private fun EditMenu(onAddWidget: () -> Unit, onCustomize: () -> Unit, onWallpap
             .width(220.dp)
             .clip(shape)
             .background(Tokens.MenuBackground)
-            .border(1.dp, Tokens.MenuStroke, shape)
+            .shapeBorder(1.dp, Tokens.MenuStroke, shape)
             .padding(vertical = Tokens.MenuVerticalPadding),
     ) {
         EditMenuRow(Icons.Rounded.Widgets, stringResource(R.string.edit_add_widget), onAddWidget)
@@ -154,7 +154,7 @@ fun RemoveAppDialog(app: AppInfo, onRemoveFromHome: () -> Unit, onUninstall: () 
                 .width(320.dp)
                 .clip(shape)
                 .background(Color(0xF02C2C2E))
-                .border(1.dp, Color.White.copy(alpha = 0.12f), shape)
+                .shapeBorder(1.dp, Color.White.copy(alpha = 0.12f), shape)
                 .padding(18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
