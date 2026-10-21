@@ -43,6 +43,12 @@ class AppInfo(
     /** Stable id used to persist the home screen layout; ends with the profile ([userOf]). */
     override val key: String = "${component.flattenToString()}#${profileId(info.user)}"
 
+    /**
+     * Notification badge key ([badgeKey]): notifications belong to the package, so every
+     * launcher activity of one app in one profile shares it.
+     */
+    val badgeKey: String = badgeKey(component.packageName, profileId(info.user))
+
     /** The same app shown under another (custom) label. */
     fun withLabel(label: String): AppInfo = AppInfo(info, label, iconVersion)
 }
