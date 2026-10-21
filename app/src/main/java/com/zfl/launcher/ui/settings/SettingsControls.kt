@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.horizontalDrag
@@ -40,10 +41,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import com.zfl.launcher.ui.theme.launcherHaptics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.zfl.launcher.ui.glass.GlassProfile
@@ -121,35 +129,49 @@ fun IosSlider(
     valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     enabled: Boolean = true,
     onValueChangeFinished: () -> Unit = {},
+    onValueChangeCancelled: () -> Unit = {},
+    thumbSize: Dp = ControlStyle.SliderKnobWidth,
+    color: Color = Color.Unspecified,
 ) {
     val onChange by rememberUpdatedState(onValueChange)
     val onFinished by rememberUpdatedState(onValueChangeFinished)
+    val onCancelled by rememberUpdatedState(onValueChangeCancelled)
     var dragging by remember { mutableStateOf(false) }
     val knobScale by animateFloatAsState(if (dragging) ControlStyle.SLIDER_PRESSED_SCALE else 1f, Motion.press(), label = "sliderKnob")
-    val knob = ControlStyle.SliderKnobWidth
-    val accent = LocalAccent.current.primary
+    val knob = thumbSize
+    val accent = if (color.isSpecified) color else LocalAccent.current.primary
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
             .height(32.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.4f }
-            .pointerInput(enabled, valueRange) {
+            .progressSemantics(value, valueRange)
+            .semantics {
+                if (enabled) setProgress { next ->
+                    onChange(next.coerceIn(valueRange))
+                    onFinished()
+                    true
+                } else disabled()
+            }
+            .pointerInput(enabled, valueRange, rtl, knob) {
                 if (!enabled) return@pointerInput
                 val knobPx = knob.toPx()
                 fun update(x: Float) {
-                    val fraction = ((x - knobPx / 2) / (size.width - knobPx)).coerceIn(0f, 1f)
+                    val logicalX = if (rtl) size.width - x else x
+                    val fraction = ((logicalX - knobPx / 2) / (size.width - knobPx)).coerceIn(0f, 1f)
                     onChange(valueRange.start + fraction * (valueRange.endInclusive - valueRange.start))
                 }
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     dragging = true
                     update(down.position.x)
-                    horizontalDrag(down.id) { change ->
+                    val completed = horizontalDrag(down.id) { change ->
                         update(change.position.x)
                         change.consume()
                     }
                     dragging = false
-                    onFinished()
+                    if (completed) onFinished() else onCancelled()
                 }
             },
         contentAlignment = Alignment.CenterStart,
@@ -173,7 +195,7 @@ fun IosSlider(
         Box(
             Modifier
                 .offset(x = travel * fraction)
-                .size(knob, ControlStyle.SliderKnobHeight)
+                .size(knob)
                 .graphicsLayer { scaleX = knobScale; scaleY = knobScale }
                 .shadow(3.dp, CircleShape)
                 .background(Color.White, CircleShape),
@@ -194,6 +216,7 @@ fun SliderRow(
     onValueChangeFinished: () -> Unit,
     valueRange: ClosedFloatingPointRange<Float>,
     enabled: Boolean = true,
+    onValueChangeCancelled: () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -211,6 +234,7 @@ fun SliderRow(
             valueRange = valueRange,
             enabled = enabled,
             onValueChangeFinished = onValueChangeFinished,
+            onValueChangeCancelled = onValueChangeCancelled,
         )
     }
 }
